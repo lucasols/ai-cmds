@@ -18,21 +18,54 @@ const [, , cmdFromTerminal, ...cmdArgs] = process.argv;
 type Cmd = {
   short?: string;
   description: string;
-  run: (cmdArgs: Record<string, any>) => Promise<void> | void;
+  run: (...args: any[]) => Promise<void> | void;
   args?: Record<string, Arg>;
 };
 
-type Arg = {
-  type: 'positional-string';
+type PositionalArg = {
+  type: 'positional-string' | 'positional-number';
   pos: number;
   required: boolean;
   name: string;
   description: string;
 };
 
-export function createCmd<
-  Args extends undefined | Record<string, Arg> = undefined,
->({
+type Arg =
+  | PositionalArg
+  | {
+      type: 'flag';
+      name: string;
+      description: string;
+    }
+  | {
+      type: 'value-flag';
+      valueType: 'string' | 'number';
+      required: boolean;
+      name: string;
+      description: string;
+    };
+
+type GetArgType<T extends Arg> =
+  T extends PositionalArg & { required: false } ?
+    T['type'] extends 'positional-string' ? string | undefined
+    : T['type'] extends 'positional-number' ? number | undefined
+    : never
+  : T extends PositionalArg & { required: true } ?
+    T['type'] extends 'positional-string' ? string
+    : T['type'] extends 'positional-number' ? number
+    : never
+  : T extends { type: 'flag' } ? boolean
+  : T extends { type: 'value-flag'; required: false } ?
+    T['valueType'] extends 'string' ? string | undefined
+    : T['valueType'] extends 'number' ? number | undefined
+    : never
+  : T extends { type: 'value-flag'; required: true } ?
+    T['valueType'] extends 'string' ? string
+    : T['valueType'] extends 'number' ? number
+    : never
+  : never;
+
+export function createCmd<Args extends undefined | Record<string, Arg>>({
   short,
   description,
   run,
@@ -42,11 +75,7 @@ export function createCmd<
   description: string;
   args?: Args;
   run: (cmdArgs: {
-    [K in keyof Args]: Args[K] extends Arg ?
-      Args[K]['type'] extends 'positional-string' ?
-        string
-      : never
-    : never;
+    [K in keyof Args]: Args[K] extends Arg ? GetArgType<Args[K]> : never;
   }) => Promise<void> | void;
 }) {
   return {
