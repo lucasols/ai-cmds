@@ -9,12 +9,11 @@ await createCLI(
       args: {
         pr: {
           type: 'positional-number',
-          pos: 0,
-          required: false,
           name: 'pr',
           description: 'The pull request to review',
         },
       },
+      examples: [{ args: ['123'], description: 'Review pull request 123' }],
       run: async () => {
         console.log('Reviewing pull request');
       },
