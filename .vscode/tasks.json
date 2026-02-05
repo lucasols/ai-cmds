@@ -16,7 +16,7 @@
     {
       "label": "bump version and deploy",
       "type": "shell",
-      "command": "pnpm exec @ls-stack/pkg-manager p",
+      "command": "pnpm exec pkg-manager p",
       "problemMatcher": []
     },
     {
