@@ -181,8 +181,7 @@ export default defineConfig({
 
 The `getFiles` function receives a context object with:
 - `stagedFiles`: Files currently staged for commit
-- `prFiles`: Files changed in the PR (empty if no PR number provided)
-- `allFiles`: All files changed compared to base branch
+- `allFiles`: All files changed compared to base branch (or PR files if reviewing a PR)
 
 To include built-in options alongside your custom scopes, use `BUILT_IN_SCOPE_OPTIONS`:
 

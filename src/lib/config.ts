@@ -35,9 +35,7 @@ export type SetupConfig = {
 export type ScopeContext = {
   /** Files currently staged for commit */
   stagedFiles: string[];
-  /** Files changed in the PR (empty if no PR number provided) */
-  prFiles: string[];
-  /** All files changed compared to base branch */
+  /** All files changed compared to base branch (or PR files if reviewing a PR) */
   allFiles: string[];
 };
 

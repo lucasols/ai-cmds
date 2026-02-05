@@ -15,7 +15,7 @@ export const DEFAULT_SCOPES = {
   },
   pr: {
     label: 'pr',
-    getFiles: (ctx: ScopeContext) => ctx.prFiles,
+    getFiles: (ctx: ScopeContext) => ctx.allFiles,
   },
 } as const satisfies Record<string, ScopeConfig>;
 

@@ -77,7 +77,7 @@ async function fetchAllFileLists(
 
   // Fetch PR data and files if PR number provided
   let prData: PRData | null = null;
-  let prFiles: string[] = [];
+  let prFiles: string[] | null = null;
 
   if (prNumber) {
     [prData, prFiles] = await Promise.all([
@@ -95,8 +95,8 @@ async function fetchAllFileLists(
     prData,
     scopeContext: {
       stagedFiles,
-      prFiles,
-      allFiles,
+      // Use PR files when PR is provided, otherwise use all changed files vs base
+      allFiles: prFiles ?? allFiles,
     },
   };
 }
@@ -283,7 +283,7 @@ export const reviewCodeChangesCommand = createCmd({
         },
         {
           value: 'pr',
-          label: `PR changes${scopeContext.prFiles.length > 0 ? ` (${scopeContext.prFiles.length} files)` : ' (enter PR number)'}`,
+          label: `PR changes${prNumber ? ` (${scopeContext.allFiles.length} files)` : ' (enter PR number)'}`,
         },
       ];
 
@@ -313,7 +313,7 @@ export const reviewCodeChangesCommand = createCmd({
     }
 
     // Handle PR scope that needs PR number
-    if (scopeLabel === 'pr' && !prNumber && scopeContext.prFiles.length === 0) {
+    if (scopeLabel === 'pr' && !prNumber) {
       const prInput = await cliInput.text('Enter PR number');
       prNumber = prInput;
 
@@ -323,7 +323,7 @@ export const reviewCodeChangesCommand = createCmd({
         await fetchAllFileLists(prNumber, resolvedBaseBranch);
 
       // Update scope context with PR files
-      scopeContext.prFiles = newScopeContext.prFiles;
+      scopeContext.allFiles = newScopeContext.allFiles;
 
       // Update prData if it was fetched
       if (newPrData) {
