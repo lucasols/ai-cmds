@@ -7,10 +7,17 @@ import {
   createListDirectoryTool,
   createRipgrepTool,
 } from '../../lib/ai-tools.ts';
-import { createReviewPrompt, createValidationPrompt } from './prompts.ts';
+import {
+  createReviewPrompt,
+  createValidationPrompt,
+  createPreviousReviewCheckPrompt,
+} from './prompts.ts';
+import { github } from '../../lib/github.ts';
+import { EXTRA_DETAILS_MARKER, PR_REVIEW_MARKER } from './output.ts';
 import type {
   Model,
   ReviewContext,
+  PRReviewContext,
   PRData,
   IndividualReview,
   ValidatedReview,
@@ -262,6 +269,89 @@ export async function reviewValidator(
       totalTokens: formatUsage.totalTokens ?? 0,
       reasoningTokens: formatUsage.reasoningTokens ?? 0,
       model: getModelId(formatter.model),
+    },
+  };
+}
+
+export async function runPreviousReviewCheck(
+  context: PRReviewContext,
+  prData: PRData | null,
+  changedFiles: string[],
+  prDiff: string,
+  { model, config }: Model,
+  reviewInstructionsPath?: string,
+): Promise<IndividualReview | null> {
+  const previousReviewBody = await github.getLatestPRReviewComment(
+    context.prNumber,
+    PR_REVIEW_MARKER,
+  );
+
+  if (!previousReviewBody) {
+    console.log('ℹ️ No previous review found for this PR');
+    return null;
+  }
+
+  const previousIssues = github.parsePreviousReviewIssues(
+    previousReviewBody,
+    PR_REVIEW_MARKER,
+    EXTRA_DETAILS_MARKER,
+  );
+
+  if (!previousIssues) {
+    console.log('ℹ️ Could not parse issues from previous review');
+    return null;
+  }
+
+  console.log('🔍 Checking if previous review issues are still present...');
+
+  const prompt = createPreviousReviewCheckPrompt(
+    context,
+    prData,
+    changedFiles,
+    prDiff,
+    previousIssues,
+    reviewInstructionsPath,
+  );
+
+  const result = await resultify(
+    generateText({
+      model,
+      system: prompt.system,
+      prompt: prompt.prompt,
+      maxOutputTokens: 100_000,
+      stopWhen: stepCountIs(50),
+      maxRetries: 3,
+      tools: {
+        readFile: createReadFileTool('previous-review-checker'),
+        listDirectory: createListDirectoryTool('previous-review-checker'),
+        ripgrep: createRipgrepTool('previous-review-checker'),
+      },
+      ...(config?.topP !== false && { topP: config?.topP ?? 0.7 }),
+      providerOptions:
+        config?.providerOptions ?
+          { [getProviderId(model)]: config.providerOptions }
+        : undefined,
+    }),
+  );
+
+  const modelId = getModelId(model);
+
+  if (result.error) {
+    console.error(`❌ Previous review check failed with model ${modelId}`);
+    return null;
+  }
+
+  console.log(`✅ Previous review check completed with model ${modelId}`);
+
+  return {
+    reviewerId: 'previous-review-checker',
+    content: result.value.text,
+    usage: {
+      promptTokens: result.value.usage.inputTokens ?? 0,
+      completionTokens: result.value.usage.outputTokens ?? 0,
+      totalTokens: result.value.usage.totalTokens ?? 0,
+      reasoningTokens: result.value.usage.reasoningTokens,
+      model: modelId,
     },
   };
 }

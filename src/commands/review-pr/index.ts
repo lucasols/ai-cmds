@@ -14,7 +14,11 @@ import {
   handleOutput,
   logTokenUsageBreakdown,
 } from '../shared/output.ts';
-import { reviewValidator, runSingleReview } from '../shared/reviewer.ts';
+import {
+  reviewValidator,
+  runSingleReview,
+  runPreviousReviewCheck,
+} from '../shared/reviewer.ts';
 import {
   resolveSetup,
   reviewSetupConfigs,
@@ -43,6 +47,11 @@ export const reviewPRCommand = createCmd({
       name: 'test',
       description: 'Test mode - skip posting to PR',
     },
+    skipPreviousCheck: {
+      type: 'flag',
+      name: 'skip-previous-check',
+      description: 'Skip checking if previous review issues are still present',
+    },
   },
   examples: [
     { args: ['--pr', '123'], description: 'Review PR #123' },
@@ -55,7 +64,7 @@ export const reviewPRCommand = createCmd({
       description: 'Heavy review of PR #123',
     },
   ],
-  run: async ({ pr, setup, test }) => {
+  run: async ({ pr, setup, test, skipPreviousCheck }) => {
     if (!pr) {
       showErrorAndExit('PR number is required. Use --pr <number>');
     }
@@ -130,9 +139,23 @@ export const reviewPRCommand = createCmd({
       additionalInstructions: undefined,
     };
 
+    const shouldRunPreviousCheck = !skipPreviousCheck && mode === 'gh-actions';
+
     console.log(
       `🔍 Running ${setupConfig.reviewers.length} independent reviews...`,
     );
+
+    const previousReviewPromise =
+      shouldRunPreviousCheck ?
+        runPreviousReviewCheck(
+          context,
+          prData,
+          changedFiles,
+          prDiff,
+          setupConfig.validator,
+          config.reviewInstructionsPath,
+        )
+      : Promise.resolve(null);
 
     const reviewPromises = setupConfig.reviewers.map((model, index) =>
       runSingleReview(
@@ -146,10 +169,23 @@ export const reviewPRCommand = createCmd({
       ),
     );
 
+    const [previousReviewResult, ...reviewResults] = await Promise.allSettled([
+      previousReviewPromise,
+      ...reviewPromises,
+    ]);
+
     const successfulReviews: IndividualReview[] = [];
 
-    const results = await Promise.allSettled(reviewPromises);
-    for (const result of results) {
+    if (
+      previousReviewResult.status === 'fulfilled' &&
+      previousReviewResult.value !== null &&
+      previousReviewResult.value.usage.totalTokens > 0 &&
+      !previousReviewResult.value.content.trim().includes('No issues found')
+    ) {
+      successfulReviews.push(previousReviewResult.value);
+    }
+
+    for (const result of reviewResults) {
       if (result.status === 'fulfilled') {
         successfulReviews.push(result.value);
       } else {

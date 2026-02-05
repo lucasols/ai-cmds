@@ -259,6 +259,60 @@ export async function getUnviewedPRFiles(prNumber: string): Promise<string[]> {
     .map((file) => file.path);
 }
 
+export async function getLatestPRReviewComment(
+  prNumber: string,
+  marker: string,
+): Promise<string | null> {
+  const comments = await getPRIssueComments(prNumber);
+
+  const botReviewComments = comments
+    .filter(
+      (comment) =>
+        comment.user.login === 'github-actions[bot]' &&
+        comment.body.includes(marker),
+    )
+    .sort(
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    );
+
+  const latestComment = botReviewComments[0];
+
+  if (!latestComment) {
+    return null;
+  }
+
+  const hasIssueMarkers =
+    latestComment.body.includes('🔴') ||
+    latestComment.body.includes('🟠') ||
+    latestComment.body.includes('🟡');
+
+  if (!hasIssueMarkers) {
+    return null;
+  }
+
+  return latestComment.body;
+}
+
+export function parsePreviousReviewIssues(
+  reviewBody: string,
+  marker: string,
+  extraDetailsMarker: string,
+): string | null {
+  let content = reviewBody.replace(`<!-- ${marker} -->`, '').trim();
+
+  const extraDetailsIndex = content.indexOf(extraDetailsMarker);
+  if (extraDetailsIndex !== -1) {
+    content = content.slice(0, extraDetailsIndex).trim();
+  }
+
+  if (!content) {
+    return null;
+  }
+
+  return content;
+}
+
 export const github = {
   getPRData,
   getChangedFiles,
@@ -268,4 +322,6 @@ export const github = {
   isHumanUser,
   getAllHumanPRComments,
   getUnviewedPRFiles,
+  getLatestPRReviewComment,
+  parsePreviousReviewIssues,
 };

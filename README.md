@@ -72,10 +72,21 @@ ai-cmds review-pr --pr 123 --setup heavy
 - `--pr` - PR number to review (**required**)
 - `--setup` - Review setup: `light`, `medium`, `heavy`, or custom setup label
 - `--test` - Test mode: skip posting review to PR, just save to file
+- `--skip-previous-check` - Skip checking if previous review issues are still present
 
 **Behavior:**
 - In GitHub Actions (`GITHUB_ACTIONS` env set): Posts review as PR comment
 - With `--test` flag or locally: Saves review to `pr-review-test.md`
+
+**Previous Review Check:**
+
+When running in GitHub Actions mode, the tool automatically checks if there's a previous AI review on the PR. If issues were found in a previous review, it verifies whether those issues are still present in the current code. This helps track if feedback has been addressed without requiring a full re-review.
+
+- Only runs in `gh-actions` mode (not in `--test` mode)
+- Looks for previous reviews posted by `github-actions[bot]`
+- Only reports issues that are still present (fixed issues are not mentioned)
+- Runs in parallel with regular reviews for efficiency
+- Use `--skip-previous-check` to disable this feature
 
 ## Review Setups
 

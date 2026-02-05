@@ -11,8 +11,8 @@ import type {
   ReviewIssue,
 } from './types.ts';
 
-const EXTRA_DETAILS_MARKER = '<!-- EXTRA_DETAILS -->';
-const PR_REVIEW_MARKER = 'AI_CLI_PR_REVIEW';
+export const EXTRA_DETAILS_MARKER = '<!-- EXTRA_DETAILS -->';
+export const PR_REVIEW_MARKER = 'AI_CLI_PR_REVIEW';
 
 function formatNum(num: number): string {
   return num.toLocaleString('en-US', {

@@ -3,6 +3,7 @@ import { dedent } from '@ls-stack/utils/dedent';
 import { git } from '../../lib/git.ts';
 import type {
   ReviewContext,
+  PRReviewContext,
   PRData,
   IndividualReview,
   GeneralPRComment,
@@ -371,6 +372,75 @@ ${humanFeedback}
 ${allReviews}
 </all_reviews>
 `;
+
+  return { system, prompt };
+}
+
+export function createPreviousReviewCheckPrompt(
+  context: PRReviewContext,
+  prData: PRData | null,
+  changedFiles: string[],
+  prDiff: string,
+  previousIssues: string,
+  reviewInstructionsPath?: string,
+): { system: string; prompt: string } {
+  const reviewInstructions = getReviewInstructions(reviewInstructionsPath);
+
+  const system = dedent`
+    <review_instructions format="markdown">
+    ${reviewInstructions}
+    </review_instructions>
+
+    <role>
+    You are an expert code reviewer verifying if previously identified issues have been fixed in the latest code changes.
+    </role>
+
+    <tools>
+    Available tools to assist your review:
+    - **readFile**: Use to examine the current state of files to verify if issues are fixed
+    - **listDirectory**: Use to explore project structure and understand file organization
+    - **ripgrep**: Use to search for patterns in files across the codebase (supports regex, respects .gitignore)
+    </tools>
+
+    <task>
+    You are reviewing a PR that has already been reviewed before. The previous review found some issues.
+
+    Your job is to:
+    1. Check each previously identified issue against the CURRENT code
+    2. Only report issues that are STILL PRESENT in the code
+    3. If an issue has been fixed, DO NOT mention it at all
+    4. Use the same output format (🔴 Critical, 🟠 Possible Problems, 🟡 Suggestions)
+    5. If ALL issues have been fixed, respond with exactly: "No issues found."
+
+    IMPORTANT:
+    - Use the readFile tool to verify the current state of the code
+    - Focus on the specific issues mentioned in the previous review
+    - Do not look for new issues - only verify if the previous issues are still present
+    - Be thorough: read the actual files to confirm whether each issue was addressed
+    </task>
+
+    <output_format format="markdown">
+    ${outputFormat}
+    </output_format>
+  `;
+
+  const promptCacheableData = getPromptCacheableData(
+    context,
+    prData,
+    changedFiles,
+    prDiff,
+  );
+
+  const prompt = dedent`
+    ${promptCacheableData}
+
+    <previous_review_issues>
+    ${previousIssues}
+    </previous_review_issues>
+
+    Please verify if these previously identified issues are still present in the current code.
+    Use the readFile tool to check the actual file contents before making your determination.
+  `;
 
   return { system, prompt };
 }
