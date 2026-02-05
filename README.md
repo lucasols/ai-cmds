@@ -32,19 +32,19 @@ pnpm add ai-cmds
 
 ```bash
 # Review staged changes
-ai-cmds review-code --scope staged
+ai-cmds review-code-changes --scope staged
 
 # Review a specific PR
-ai-cmds review-code --pr 123
+ai-cmds review-code-changes --pr 123
 
 # Review all changes against base branch
-ai-cmds review-code --scope all
+ai-cmds review-code-changes --scope all
 
 # Use a specific review setup
-ai-cmds review-code --setup light
+ai-cmds review-code-changes --setup light
 
 # Specify base branch
-ai-cmds review-code --scope all --base-branch develop
+ai-cmds review-code-changes --scope all --base-branch develop
 ```
 
 ### Review Setups
@@ -131,7 +131,7 @@ export default defineConfig({
 Use custom setups via CLI:
 
 ```bash
-ai-cmds review-code --setup myCustomSetup
+ai-cmds review-code-changes --setup myCustomSetup
 ```
 
 ## License
