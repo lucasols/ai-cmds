@@ -1,11 +1,13 @@
 import { cliInput, createCmd } from '@ls-stack/cli';
 import { dedent } from '@ls-stack/utils/dedent';
-import { writeFile } from 'fs/promises';
+import { mkdir, writeFile } from 'fs/promises';
+import { dirname } from 'path';
 import { estimateTokenCount } from 'tokenx';
 import {
   getExcludePatterns,
   loadConfig,
   resolveBaseBranch,
+  resolveLogsDir,
   type ScopeConfig,
   type ScopeContext,
 } from '../../lib/config.ts';
@@ -16,11 +18,14 @@ import { applyExcludePatterns, getDiffForFiles } from '../shared/diff-utils.ts';
 import {
   calculateReviewsUsage,
   calculateTotalUsage,
+  createZeroTokenUsage,
   formatValidatedReview,
   handleOutput,
   logTokenUsageBreakdown,
+  logValidatedIssueSummary,
 } from '../shared/output.ts';
 import { reviewValidator, runSingleReview } from '../shared/reviewer.ts';
+import { persistReviewRunLogs } from '../shared/review-logs.ts';
 import {
   BUILT_IN_SCOPE_OPTIONS,
   getAvailableScopes,
@@ -38,36 +43,137 @@ import type { IndividualReview, LocalReviewContext } from '../shared/types.ts';
 
 const MAX_DIFF_TOKENS = 60_000;
 
-async function fetchLocalFileLists(baseBranch: string): Promise<ScopeContext> {
-  const stagedFilesPromise = runCmdSilentUnwrap([
+type ResolvedComparisonBaseRef = {
+  baseBranch: string;
+  comparisonRef: string;
+  source: 'remote' | 'local';
+};
+
+function parseFiles(output: string): string[] {
+  return output.trim().split('\n').filter(Boolean);
+}
+
+async function writeReviewFile(outputFilePath: string, content: string) {
+  await mkdir(dirname(outputFilePath), { recursive: true });
+  await writeFile(outputFilePath, content);
+}
+
+function getScopeDiffSource(scopeConfig: ScopeConfig): 'branch' | 'staged' {
+  return scopeConfig.diffSource ?? 'branch';
+}
+
+async function fetchStagedFiles(): Promise<string[]> {
+  const output = await runCmdSilentUnwrap([
     'git',
     'diff',
     '--cached',
     '--name-only',
-  ]).then((output) => output.trim().split('\n').filter(Boolean));
+  ]);
+  return parseFiles(output);
+}
 
-  const allFilesPromise = (async () => {
-    await runCmdSilentUnwrap([
-      'git',
-      'fetch',
-      'origin',
-      `${baseBranch}:${baseBranch}`,
-    ]).catch(() => {
-      // Ignore errors if branch doesn't exist on remote or is already up to date
-    });
+async function fetchChangedFilesAgainstRef(ref: string): Promise<string[]> {
+  const output = await runCmdSilentUnwrap([
+    'git',
+    'diff',
+    '--name-only',
+    `${ref}...HEAD`,
+  ]);
+  return parseFiles(output);
+}
 
-    const output = await runCmdSilentUnwrap([
-      'git',
-      'diff',
-      '--name-only',
-      `origin/${baseBranch}...HEAD`,
-    ]);
-    return output.trim().split('\n').filter(Boolean);
-  })();
+async function refExists(ref: string): Promise<boolean> {
+  try {
+    await runCmdSilentUnwrap(['git', 'rev-parse', '--verify', '--quiet', ref]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function resolveComparisonBaseRef(
+  baseBranch: string,
+): Promise<ResolvedComparisonBaseRef> {
+  const remoteRef = `origin/${baseBranch}`;
+
+  await runCmdSilentUnwrap(['git', 'fetch', 'origin', baseBranch]).catch(() => {
+    console.warn(
+      `⚠️ Could not fetch origin/${baseBranch}. Falling back to local refs if needed.`,
+    );
+  });
+
+  if (await refExists(remoteRef)) {
+    console.log(`📌 Using remote comparison ref: ${remoteRef}`);
+    return {
+      baseBranch,
+      comparisonRef: remoteRef,
+      source: 'remote',
+    };
+  }
+
+  if (await refExists(baseBranch)) {
+    console.log(`📌 Using local comparison ref: ${baseBranch}`);
+    return {
+      baseBranch,
+      comparisonRef: baseBranch,
+      source: 'local',
+    };
+  }
+
+  showErrorAndExit(
+    `Could not resolve base branch "${baseBranch}" as either "${remoteRef}" or local "${baseBranch}"`,
+  );
+}
+
+async function resolveBaseBranchForReview(
+  currentBranch: string,
+  configuredBaseBranch:
+    | string
+    | ((currentBranch: string) => string)
+    | undefined,
+  argBaseBranch: string | undefined,
+): Promise<string> {
+  const fromArgs =
+    argBaseBranch ?? resolveBaseBranch(configuredBaseBranch, currentBranch);
+  if (fromArgs) return fromArgs;
+
+  const branches = await git.getLocalBranches();
+  const otherBranches = branches.filter((b) => b !== currentBranch);
+
+  if (otherBranches.length === 0) {
+    showErrorAndExit('No other branches found to compare against');
+  }
+
+  return cliInput.select('Select the base branch', {
+    options: otherBranches.map((branch) => ({
+      value: branch,
+      label: branch,
+    })),
+  });
+}
+
+async function loadScopeContext(params: {
+  scopeConfig: ScopeConfig;
+  comparisonRef: string | null;
+}): Promise<ScopeContext> {
+  const { scopeConfig, comparisonRef } = params;
+  const diffSource = getScopeDiffSource(scopeConfig);
+
+  if (diffSource === 'staged') {
+    const stagedFiles = await fetchStagedFiles();
+    return {
+      stagedFiles,
+      allFiles: stagedFiles,
+    };
+  }
+
+  if (!comparisonRef) {
+    throw new Error('Comparison ref is required for branch-based scopes');
+  }
 
   const [stagedFiles, allFiles] = await Promise.all([
-    stagedFilesPromise,
-    allFilesPromise,
+    fetchStagedFiles(),
+    fetchChangedFilesAgainstRef(comparisonRef),
   ]);
 
   return { stagedFiles, allFiles };
@@ -92,15 +198,27 @@ export const reviewCodeChangesCommand = createCmd({
       name: 'base-branch',
       description: 'Base branch for diff comparison',
     },
+    output: {
+      type: 'value-string-flag',
+      name: 'output',
+      description: 'Output file path for the generated review markdown',
+    },
   },
   examples: [
     { args: ['--scope', 'staged'], description: 'Review staged changes' },
     { args: ['--scope', 'all'], description: 'Review all changes vs base' },
     { args: ['--setup', 'light'], description: 'Use light review setup' },
+    {
+      args: ['--scope', 'all', '--output', 'reviews/local-review.md'],
+      description: 'Save the review to a custom file path',
+    },
   ],
-  run: async ({ setup, scope, baseBranch }) => {
+  run: async ({ setup, scope, baseBranch, output }) => {
+    const runStartedAt = new Date();
     const rootConfig = await loadConfig();
     const config = rootConfig.codeReview ?? {};
+    const outputFile = output ?? config.reviewOutputPath ?? 'pr-review.md';
+    const logsDir = resolveLogsDir(config);
 
     let setupConfig: ReviewSetupConfig | undefined = resolveSetup(
       config,
@@ -131,32 +249,6 @@ export const reviewCodeChangesCommand = createCmd({
       }
     }
 
-    const currentBranch = git.getCurrentBranch();
-
-    const resolvedBaseBranch = await (async () => {
-      const fromArgs =
-        baseBranch ?? resolveBaseBranch(config.baseBranch, currentBranch);
-
-      if (fromArgs) return fromArgs;
-
-      const branches = await git.getLocalBranches();
-      const otherBranches = branches.filter((b) => b !== currentBranch);
-
-      if (otherBranches.length === 0) {
-        showErrorAndExit('No other branches found to compare against');
-      }
-
-      return cliInput.select('Select the base branch', {
-        options: otherBranches.map((branch) => ({
-          value: branch,
-          label: branch,
-        })),
-      });
-    })();
-
-    console.log('\n🔄 Fetching file lists...');
-    const scopeContext = await fetchLocalFileLists(resolvedBaseBranch);
-
     let scopeConfig: ScopeConfig | undefined = resolveScope(config, scope);
     let scopeLabel = scope;
 
@@ -169,12 +261,10 @@ export const reviewCodeChangesCommand = createCmd({
 
     if (!scopeConfig) {
       const scopesToUse = config.scope ?? BUILT_IN_SCOPE_OPTIONS;
-      const options = scopeConfigsToOptions(scopesToUse, scopeContext);
-
+      const options = scopeConfigsToOptions(scopesToUse);
       const selectedScope = await cliInput.select('Select the review scope', {
         options,
       });
-
       scopeLabel = selectedScope;
       scopeConfig = resolveScope(config, selectedScope);
 
@@ -183,7 +273,42 @@ export const reviewCodeChangesCommand = createCmd({
       }
     }
 
-    const scopeFiles = await scopeConfig.getFiles(scopeContext);
+    const currentBranch = git.getCurrentBranch();
+    const diffSource = getScopeDiffSource(scopeConfig);
+    const useStaged = diffSource === 'staged';
+
+    let comparisonBaseRef: ResolvedComparisonBaseRef | null = null;
+    if (!useStaged) {
+      const selectedBaseBranch = await resolveBaseBranchForReview(
+        currentBranch,
+        config.baseBranch,
+        baseBranch,
+      );
+      comparisonBaseRef = await resolveComparisonBaseRef(selectedBaseBranch);
+    }
+
+    console.log('\n🔄 Fetching file lists...');
+    let scopeContext: ScopeContext;
+    try {
+      scopeContext = await loadScopeContext({
+        scopeConfig,
+        comparisonRef: comparisonBaseRef?.comparisonRef ?? null,
+      });
+    } catch (error) {
+      showErrorAndExit(
+        `Failed to load scope context for "${scopeConfig.id}": ${String(error)}`,
+      );
+    }
+
+    let scopeFiles: string[];
+    try {
+      scopeFiles = await scopeConfig.getFiles(scopeContext);
+    } catch (error) {
+      showErrorAndExit(
+        `Failed to resolve files for scope "${scopeConfig.id}": ${String(error)}`,
+      );
+    }
+
     const excludePatterns = getExcludePatterns(config);
     const changedFiles = applyExcludePatterns(scopeFiles, excludePatterns);
 
@@ -201,22 +326,56 @@ export const reviewCodeChangesCommand = createCmd({
     }
 
     const sourceDescription =
-      scopeLabel === 'staged' ? 'staged changes' : (
-        `${currentBranch} vs ${resolvedBaseBranch}`
+      useStaged ? 'staged changes' : (
+        `${currentBranch} vs ${comparisonBaseRef?.comparisonRef ?? 'unknown'}`
       );
 
     console.log(`\n🔄 Processing ${sourceDescription}...`);
+    if (comparisonBaseRef?.source === 'local') {
+      console.log(
+        `⚠️ Running against local base branch "${comparisonBaseRef.baseBranch}" because remote ref was unavailable.`,
+      );
+    }
 
     console.log(
       `📋 Using ${setupLabel} setup with ${setupConfig.reviewers.length} reviewer(s)\n`,
     );
 
-    const useStaged = scopeLabel === 'staged';
     const prDiff = await getDiffForFiles(changedFiles, {
-      baseBranch: resolvedBaseBranch,
+      baseBranch: comparisonBaseRef?.comparisonRef ?? currentBranch,
       excludeFiles: excludePatterns,
       useStaged,
     });
+
+    const context: LocalReviewContext = {
+      type: 'local',
+      additionalInstructions: undefined,
+    };
+
+    if (!prDiff.trim()) {
+      console.log(
+        'ℹ️ No reviewable code changes found after filtering import/export-only changes.',
+      );
+      const skippedUsage = createZeroTokenUsage('validator-skipped');
+      const reviewContent = await formatValidatedReview(
+        {
+          summary:
+            'No reviewable code changes found after filtering import/export-only changes.',
+          issues: [],
+          usage: skippedUsage,
+        },
+        'local',
+        context,
+        currentBranch,
+        {
+          reviews: [],
+          validatorUsage: skippedUsage,
+        },
+      );
+      await writeReviewFile(outputFile, reviewContent);
+      await handleOutput(context, reviewContent, outputFile);
+      return;
+    }
 
     const diffTokens = estimateTokenCount(prDiff);
 
@@ -237,11 +396,6 @@ export const reviewCodeChangesCommand = createCmd({
       }
     }
 
-    const context: LocalReviewContext = {
-      type: 'local',
-      additionalInstructions: undefined,
-    };
-
     console.log(
       `🔍 Running ${setupConfig.reviewers.length} independent reviews...`,
     );
@@ -255,11 +409,11 @@ export const reviewCodeChangesCommand = createCmd({
         index + 1,
         model,
         config.reviewInstructionsPath,
+        config.includeAgentsFileInReviewPrompt,
       ),
     );
 
     const successfulReviews: IndividualReview[] = [];
-
     const results = await Promise.allSettled(reviewPromises);
     for (const result of results) {
       if (result.status === 'fulfilled') {
@@ -273,9 +427,7 @@ export const reviewCodeChangesCommand = createCmd({
       showErrorAndExit('All reviewers failed - cannot proceed with review');
     }
 
-    console.log('\n');
-
-    console.log('🔍 Running feedback checker to validate findings...');
+    console.log('\n🔍 Running validator to consolidate findings...');
     const validatedReview = await reviewValidator(
       context,
       successfulReviews,
@@ -284,25 +436,20 @@ export const reviewCodeChangesCommand = createCmd({
       prDiff,
       undefined,
       setupConfig.validator,
-      setupConfig.formatter,
       config.reviewInstructionsPath,
     );
     console.log(
       `✅ Validation complete - found ${validatedReview.issues.length} validated issues`,
     );
+    logValidatedIssueSummary(validatedReview);
 
     const reviewsUsage = calculateReviewsUsage(successfulReviews);
     const totalUsage = calculateTotalUsage([
       ...successfulReviews.map((review) => review.usage),
       validatedReview.usage,
-      validatedReview.formatterUsage,
     ]);
 
-    logTokenUsageBreakdown(
-      reviewsUsage,
-      validatedReview.usage,
-      validatedReview.formatterUsage,
-    );
+    logTokenUsageBreakdown(reviewsUsage, validatedReview.usage);
 
     console.log(
       dedent`
@@ -323,13 +470,30 @@ export const reviewCodeChangesCommand = createCmd({
       {
         reviews: successfulReviews,
         validatorUsage: validatedReview.usage,
-        formatterUsage: validatedReview.formatterUsage,
       },
     );
 
-    const outputFile = 'pr-review.md';
-    await writeFile(outputFile, reviewContent);
+    if (logsDir) {
+      const runLogsPath = await persistReviewRunLogs({
+        logsDir,
+        command: 'review-code-changes',
+        context,
+        setupId: setupLabel ?? setupConfig.reviewers.length.toString(),
+        scopeId: scopeConfig.id,
+        branchName: currentBranch,
+        runStartedAt,
+        runEndedAt: new Date(),
+        changedFiles,
+        prDiff,
+        reviews: successfulReviews,
+        validatedReview,
+        finalReviewMarkdown: reviewContent,
+        outputFilePath: outputFile,
+      });
+      console.log(`🗂️ Review logs saved to ${runLogsPath}`);
+    }
 
-    await handleOutput(context, reviewContent);
+    await writeReviewFile(outputFile, reviewContent);
+    await handleOutput(context, reviewContent, outputFile);
   },
 });

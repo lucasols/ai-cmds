@@ -5,14 +5,15 @@ AI-powered CLI tool that uses OpenAI and Google Gemini models to review code cha
 ## Features
 
 - Multiple AI models: GPT-5, GPT-5-mini, GPT-4o-mini, Gemini 2.5 Pro, Gemini 2.0 Flash
-- Configurable review setups from very light to heavy
-- Custom setups with full control over reviewer, validator, and formatter models
+- Configurable review setups from light to heavy
+- Custom setups with full control over reviewer and validator models
 - Three commands: `review-code-changes` for local development, `review-pr` for CI, `create-pr` for PR creation
-- Parallel reviews with validation pass for higher accuracy
+- Parallel reviews with a single structured validation pass for higher accuracy
 - AI-generated PR titles and descriptions
 - Automatic filtering of import-only changes
 - Custom review instructions support
 - Token usage tracking and cost awareness
+- Improved review visualization with severity totals, issue IDs (`C1`, `P1`, `S1`), and impacted file counts
 
 ## Installation
 
@@ -47,12 +48,16 @@ ai-cmds review-code-changes --setup light
 
 # Specify base branch
 ai-cmds review-code-changes --scope all --base-branch develop
+
+# Save review to a custom file path
+ai-cmds review-code-changes --scope all --output reviews/local-review.md
 ```
 
 **Arguments:**
 - `--scope` - Review scope: `all`, `staged`, `globs`, `unViewed`, or custom scope id
 - `--setup` - Review setup: `light`, `medium`, `heavy`, or custom setup id
 - `--base-branch` - Base branch for diff comparison (if not specified, prompts for selection)
+- `--output` - Output file path for the generated review markdown (default: `pr-review.md`)
 
 ### `review-pr` - CI/PR Review
 
@@ -71,13 +76,14 @@ ai-cmds review-pr --pr 123 --setup heavy
 
 **Arguments:**
 - `--pr` - PR number to review (**required**)
-- `--setup` - Review setup: `light`, `medium`, `heavy`, or custom setup label
+- `--setup` - Review setup: `light`, `medium`, `heavy`, or custom setup id
 - `--test` - Test mode: skip posting review to PR, just save to file
 - `--skip-previous-check` - Skip checking if previous review issues are still present
 
 **Behavior:**
 - In GitHub Actions (`GITHUB_ACTIONS` env set): Posts review as PR comment
 - With `--test` flag or locally: Saves review to `pr-review-test.md`
+- If the filtered diff has no reviewable code (for example import/export-only changes), the command skips AI calls and emits a no-issues review
 
 **Previous Review Check:**
 
@@ -127,12 +133,9 @@ ai-cmds create-pr --title "Fix login validation"
 
 | Setup | Reviewers | Description |
 |-------|-----------|-------------|
-| `veryLight` | 1× GPT-5-mini | Fastest, lowest cost |
 | `light` | 1× GPT-5 | Balanced |
 | `medium` | 2× GPT-5 (high reasoning) | More thorough |
 | `heavy` | 4× GPT-5 (high reasoning) | Most comprehensive |
-| `lightGoogle` | 1× Gemini 2.5 Pro | Google alternative |
-| `mediumGoogle` | 2× Gemini 2.5 Pro | Google thorough |
 
 ## Review Scopes
 
@@ -179,6 +182,7 @@ export default defineConfig({
     baseBranch: 'main',
     codeReviewDiffExcludePatterns: ['pnpm-lock.yaml', '**/*.svg', '**/*.test.ts'],
     reviewInstructionsPath: '.github/PR_REVIEW_AGENT.md',
+    includeAgentsFileInReviewPrompt: true,
   },
   createPR: {
     baseBranch: 'main',
@@ -224,11 +228,12 @@ By default, `.env` is loaded automatically before the config file is imported, a
 | `baseBranch` | Base branch for diff comparison. Can be a string or function `(currentBranch) => string`. If not set, prompts for selection |
 | `codeReviewDiffExcludePatterns` | Glob patterns for files to exclude from review |
 | `reviewInstructionsPath` | Path to custom review instructions markdown file |
+| `includeAgentsFileInReviewPrompt` | Include `<git-root>/AGENTS.md` content in reviewer prompts (default: `true`) |
+| `reviewOutputPath` | Default output file path for `review-code-changes` (can be overridden by `--output`) |
 | `setup` | Array of custom named setups (see below) |
 | `scope` | Array of custom named scopes (see below) |
 | `defaultValidator` | Default validator model for custom setups |
-| `defaultFormatter` | Default formatter model for custom setups |
-| `logsDir` | Directory for logs (can also use `AI_CLI_LOGS_DIR` env var) |
+| `logsDir` | Directory for review run artifacts (can also use `AI_CLI_LOGS_DIR` env var) |
 
 #### `createPR` Options
 
@@ -240,6 +245,13 @@ By default, `.env` is loaded automatically before the config file is imported, a
 | `descriptionInstructions` | Custom instructions for AI description generation |
 | `diffExcludePatterns` | Glob patterns for files to exclude from diff |
 | `maxDiffTokens` | Maximum tokens from diff to include in AI prompt (default: 50000) |
+
+When `codeReview.logsDir` (or `AI_CLI_LOGS_DIR`) is set, each review run stores artifacts under:
+
+- `<logsDir>/review-code-changes/<run-id>/...` for local reviews
+- `<logsDir>/review-pr/<run-id>/...` for PR reviews
+
+Each run includes `context.yaml`, `changed-files.txt`, `diff.diff`, `reviewers/*.md`, `reviewers/*-debug.yaml`, `validator.yaml`, `final-review.md`, and `summary.yaml`.
 
 ### Dynamic Base Branch
 
@@ -256,7 +268,7 @@ export default defineConfig({
 
 ### Custom Setups
 
-Define custom named setups with full control over which models are used. **When custom setups are configured, they replace built-in options** (veryLight, light, medium, heavy).
+Define custom named setups with full control over which models are used. **When custom setups are configured, they replace built-in options** (light, medium, heavy).
 
 ```typescript
 import { defineConfig } from 'ai-cmds';
@@ -267,24 +279,24 @@ export default defineConfig({
   codeReview: {
     setup: [
       {
+        id: 'myCustomSetup',
         label: 'myCustomSetup',
         reviewers: [
           { label: 'GPT-5', model: openai('gpt-5.2'), providerOptions: { reasoningEffort: 'high' } },
           { model: google('gemini-2.5-pro') },
         ],
         validator: { model: openai('gpt-5.2') },
-        formatter: { model: openai('gpt-5-mini') },
       },
       {
+        id: 'fastReview',
         label: 'fastReview',
         reviewers: [{ model: openai('gpt-5-mini') }],
-        // validator and formatter use defaults
+        // validator uses defaultValidator
       },
     ],
 
-    // Defaults for custom setups that don't specify validator/formatter
+    // Default validator for custom setups that don't specify one
     defaultValidator: { model: openai('gpt-5.2'), providerOptions: { reasoningEffort: 'high' } },
-    defaultFormatter: { model: openai('gpt-5-mini') },
   },
 });
 ```
@@ -324,11 +336,13 @@ export default defineConfig({
       {
         id: 'src-only',
         label: 'Source files only',
+        diffSource: 'branch',
         getFiles: (ctx) => ctx.allFiles.filter((f) => f.startsWith('src/')),
       },
       {
         id: 'no-tests',
         label: 'Exclude tests',
+        diffSource: 'branch',
         getFiles: (ctx) => ctx.allFiles.filter((f) => !f.includes('.test.')),
       },
     ],
@@ -339,6 +353,10 @@ export default defineConfig({
 The `getFiles` function receives a context object with:
 - `stagedFiles`: Files currently staged for commit
 - `allFiles`: All files changed compared to base branch
+
+The optional `diffSource` field controls which git diff source the scope uses:
+- `'branch'` (default): compare against selected base branch
+- `'staged'`: use staged changes
 
 To include built-in options alongside your custom scopes, use `BUILT_IN_SCOPE_OPTIONS`:
 

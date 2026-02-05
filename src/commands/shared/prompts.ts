@@ -1,4 +1,5 @@
 import { readFileSync, existsSync } from 'fs';
+import { join } from 'path';
 import { dedent } from '@ls-stack/utils/dedent';
 import { git } from '../../lib/git.ts';
 import type {
@@ -67,6 +68,32 @@ function getReviewInstructions(customPath?: string): string {
     }
   }
   return defaultReviewInstructions;
+}
+
+function getAgentsInstructions(includeAgentsFileInReviewPrompt: boolean): {
+  path: string;
+  content: string;
+} | null {
+  if (!includeAgentsFileInReviewPrompt) {
+    return null;
+  }
+
+  const agentsPath = join(git.getGitRoot(), 'AGENTS.md');
+  if (!existsSync(agentsPath)) {
+    return null;
+  }
+
+  try {
+    return {
+      path: agentsPath,
+      content: readFileSync(agentsPath, 'utf-8'),
+    };
+  } catch {
+    console.warn(
+      `Warning: Could not read AGENTS.md from ${agentsPath}, skipping AGENTS instructions`,
+    );
+    return null;
+  }
 }
 
 const outputFormat = `
@@ -202,13 +229,25 @@ export function createReviewPrompt(
   changedFiles: string[],
   prDiff: string,
   reviewInstructionsPath?: string,
+  includeAgentsFileInReviewPrompt = true,
 ): { system: string; prompt: string } {
   const reviewInstructions = getReviewInstructions(reviewInstructionsPath);
+  const agentsInstructions = getAgentsInstructions(
+    includeAgentsFileInReviewPrompt,
+  );
 
   const systemCacheableContent = `
 <review_instructions format="markdown">
 ${reviewInstructions}
 </review_instructions>
+
+${
+  agentsInstructions ?
+    `<agents_instructions format="markdown" source="${agentsInstructions.path}">
+${agentsInstructions.content}
+</agents_instructions>`
+  : ''
+}
 `;
 
   const system = `${systemCacheableContent}
@@ -345,18 +384,42 @@ Check how the X properly works and handle the affected changes to offer a precis
 
 Consider general discussion comments for additional context about the PR.
 
-Write your final review using this output format:
+Write your final output as structured JSON only, matching this shape:
 
-<output_format format="markdown">
-${outputFormat}
+<output_format format="json">
+{
+  "summary": "string",
+  "issues": [
+    {
+      "category": "critical | possible | suggestion | not-applicable-or-false-positive",
+      "files": [
+        {
+          "path": "string",
+          "line": "number | null"
+        }
+      ],
+      "description": "string",
+      "currentCode": "string | null",
+      "suggestedFix": "string | null"
+    }
+  ]
+}
 </output_format>
+
+Rules:
+- Return ONLY the JSON object. Do not include markdown.
+- Keep only actionable issues. Use not-applicable-or-false-positive for items that should be discarded.
+- Preserve code indentation inside currentCode and suggestedFix when provided.
 </task>`;
 
   const allReviews = reviews
     .filter((review) => review.usage.totalTokens > 0)
     .map(
       (review) =>
-        `## Review from Reviewer #${review.reviewerId}\n\n${review.content}`,
+        `## Review from Reviewer #${review.reviewerId}
+
+${review.content}
+`,
     )
     .join('\n\n---\n\n');
 

@@ -8,3 +8,6 @@ dist-test
 v8*.log
 last-build-version.txt
 .quokka.ts
+.env
+pr-review.md
+notes

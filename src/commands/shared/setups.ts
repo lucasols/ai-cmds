@@ -6,17 +6,6 @@ import type {
 } from '../../lib/config.ts';
 import type { Model, ReviewSetup } from './types.ts';
 
-export const gpt5MiniModel: Model = {
-  model: openai('gpt-5-mini'),
-  config: {
-    topP: false,
-    providerOptions: {
-      reasoningEffort: 'medium',
-      reasoningSummary: 'auto',
-    } satisfies OpenAIResponsesProviderOptions,
-  },
-};
-
 export const gpt5Model: Model = {
   model: openai('gpt-5.2'),
   config: {
@@ -42,24 +31,20 @@ export const gpt5ModelHigh: Model = {
 export type ReviewSetupConfig = {
   reviewers: Model[];
   validator: Model;
-  formatter: Model;
 };
 
 export const reviewSetupConfigs: Record<ReviewSetup, ReviewSetupConfig> = {
   light: {
     reviewers: [gpt5Model],
     validator: gpt5ModelHigh,
-    formatter: gpt5MiniModel,
   },
   medium: {
     reviewers: [gpt5ModelHigh, gpt5ModelHigh],
     validator: gpt5ModelHigh,
-    formatter: gpt5MiniModel,
   },
   heavy: {
     reviewers: [gpt5ModelHigh, gpt5ModelHigh, gpt5ModelHigh, gpt5ModelHigh],
     validator: gpt5ModelHigh,
-    formatter: gpt5MiniModel,
   },
 };
 
@@ -90,13 +75,7 @@ function convertCustomSetup(
     : config.defaultValidator ? toModel(config.defaultValidator)
     : (reviewers[0] ?? gpt5ModelHigh);
 
-  // Priority: setup.formatter > config.defaultFormatter > gpt5MiniModel
-  const formatter: Model =
-    setup.formatter ? toModel(setup.formatter)
-    : config.defaultFormatter ? toModel(config.defaultFormatter)
-    : gpt5MiniModel;
-
-  return { reviewers, validator, formatter };
+  return { reviewers, validator };
 }
 
 /**

@@ -40,10 +40,32 @@ export type TokenUsage = {
   model: string;
 };
 
+export type LLMDebugTrace = {
+  startedAt: string;
+  endedAt: string;
+  durationMs: number;
+  model: {
+    id: string;
+    provider: string;
+  };
+  config: Model['config'] | undefined;
+  result: {
+    text: string;
+    finishReason: unknown;
+    steps: unknown;
+    response: unknown;
+    warnings: unknown;
+    request: unknown;
+    providerMetadata: unknown;
+    experimentalOutput: unknown;
+  };
+};
+
 export type IndividualReview = {
   reviewerId: number | 'previous-review-checker';
   content: string;
   usage: TokenUsage;
+  debug?: LLMDebugTrace;
 };
 
 export type ReviewIssue = {
@@ -62,7 +84,7 @@ export type ValidatedReview = {
   issues: ReviewIssue[];
   summary: string;
   usage: TokenUsage;
-  formatterUsage: TokenUsage;
+  debug?: LLMDebugTrace;
 };
 
 export type PRData = {

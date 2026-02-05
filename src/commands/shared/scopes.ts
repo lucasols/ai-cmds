@@ -116,24 +116,28 @@ export const DEFAULT_SCOPES = {
   all: {
     id: 'all',
     label: 'All changes',
+    diffSource: 'branch',
     showFileCount: true,
     getFiles: (ctx: ScopeContext) => ctx.allFiles,
   },
   staged: {
     id: 'staged',
     label: 'Staged changes',
+    diffSource: 'staged',
     showFileCount: true,
     getFiles: (ctx: ScopeContext) => ctx.stagedFiles,
   },
   globs: {
     id: 'globs',
     label: 'Select files using glob patterns (use !pattern to exclude)',
+    diffSource: 'branch',
     showFileCount: false,
     getFiles: (ctx: ScopeContext) => selectFilesWithGlobPatterns(ctx.allFiles),
   },
   unViewed: {
     id: 'unViewed',
     label: 'Unviewed files in PR',
+    diffSource: 'branch',
     showFileCount: false,
     getFiles: async () => {
       const prNumber = await findPRForCurrentBranch();
@@ -211,9 +215,9 @@ export function getAvailableScopes(config: ReviewCodeChangesConfig): string[] {
  */
 export function tryGetFileCountSync(
   scope: ScopeConfig & { showFileCount?: boolean },
-  ctx: ScopeContext,
+  ctx?: ScopeContext,
 ): number | null {
-  if (!scope.showFileCount) {
+  if (!scope.showFileCount || !ctx) {
     return null;
   }
 
@@ -234,7 +238,7 @@ export function tryGetFileCountSync(
  */
 export function scopeConfigsToOptions(
   scopes: ScopeConfig[],
-  ctx: ScopeContext,
+  ctx?: ScopeContext,
 ): Array<{ value: string; label: string }> {
   return scopes.map((s) => {
     const fileCount = tryGetFileCountSync(s, ctx);

@@ -18,6 +18,13 @@ export default defineConfig({
     // Path to custom review instructions (optional)
     // reviewInstructionsPath: '.github/PR_REVIEW_AGENT.md',
 
+    // Include AGENTS.md in reviewer prompts (default: true)
+    // includeAgentsFileInReviewPrompt: true,
+
+    // Default output file path for `review-code-changes` (optional)
+    // Can be overridden via --output
+    // reviewOutputPath: 'reviews/local-review.md',
+
     // Custom named setups (selectable via --setup flag)
     // When custom setups are configured, they REPLACE built-in options.
     // To include built-in options alongside custom ones, use BUILT_IN_SETUP_OPTIONS:
@@ -30,18 +37,18 @@ export default defineConfig({
     //       { label: 'GPT-5', model: openai('gpt-5.2'), providerOptions: { reasoningEffort: 'high' } },
     //     ],
     //     validator: { model: openai('gpt-5.2') },
-    //     formatter: { model: openai('gpt-5-mini') },
     //   },
     // ],
 
     // Custom named scopes (selectable via --scope flag)
-    // When custom scopes are configured, they REPLACE built-in options (all, staged, pr).
+    // When custom scopes are configured, they REPLACE built-in options (all, staged, globs, unViewed).
     // To include built-in options alongside custom ones, use BUILT_IN_SCOPE_OPTIONS:
     // scope: [
     //   ...BUILT_IN_SCOPE_OPTIONS, // spread built-in options if you want to keep them
     //   {
     //     id: 'src-only',
     //     label: 'Source files only',
+    //     diffSource: 'branch',
     //     getFiles: (ctx) => ctx.allFiles.filter((f) => f.startsWith('src/')),
     //   },
     //   {
@@ -51,9 +58,8 @@ export default defineConfig({
     //   },
     // ],
 
-    // Default validator/formatter for custom setups that don't specify them
+    // Default validator for custom setups that don't specify one
     // defaultValidator: { model: openai('gpt-5.2'), providerOptions: { reasoningEffort: 'high' } },
-    // defaultFormatter: { model: openai('gpt-5-mini') },
 
     // Directory for logs (optional, can also use AI_CLI_LOGS_DIR env var)
     // logsDir: './pr-review-logs',

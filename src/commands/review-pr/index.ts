@@ -2,7 +2,11 @@ import { createCmd } from '@ls-stack/cli';
 import { dedent } from '@ls-stack/utils/dedent';
 import { writeFile } from 'fs/promises';
 import { estimateTokenCount } from 'tokenx';
-import { getExcludePatterns, loadConfig } from '../../lib/config.ts';
+import {
+  getExcludePatterns,
+  loadConfig,
+  resolveLogsDir,
+} from '../../lib/config.ts';
 import { formatNum } from '../../lib/diff.ts';
 import { github } from '../../lib/github.ts';
 import { showErrorAndExit } from '../../lib/shell.ts';
@@ -10,16 +14,20 @@ import { applyExcludePatterns, getDiffForFiles } from '../shared/diff-utils.ts';
 import {
   calculateReviewsUsage,
   calculateTotalUsage,
+  createZeroTokenUsage,
   formatValidatedReview,
   handleOutput,
   logTokenUsageBreakdown,
+  logValidatedIssueSummary,
 } from '../shared/output.ts';
 import {
   reviewValidator,
   runPreviousReviewCheck,
   runSingleReview,
 } from '../shared/reviewer.ts';
+import { persistReviewRunLogs } from '../shared/review-logs.ts';
 import {
+  getAvailableSetups,
   resolveSetup,
   reviewSetupConfigs,
   type ReviewSetupConfig,
@@ -65,12 +73,14 @@ export const reviewPRCommand = createCmd({
     },
   ],
   run: async ({ pr, setup, test, skipPreviousCheck }) => {
+    const runStartedAt = new Date();
     if (!pr) {
       showErrorAndExit('PR number is required. Use --pr <number>');
     }
 
     const rootConfig = await loadConfig();
     const config = rootConfig.codeReview ?? {};
+    const logsDir = resolveLogsDir(config);
 
     const isGitHubActions = Boolean(process.env.GITHUB_ACTIONS);
 
@@ -79,6 +89,13 @@ export const reviewPRCommand = createCmd({
       setup,
     );
     let setupLabel = setup;
+
+    if (setup && !setupConfig) {
+      const availableSetups = getAvailableSetups(config);
+      showErrorAndExit(
+        `Invalid setup: ${setup}. Valid options: ${availableSetups.join(', ')}`,
+      );
+    }
 
     if (!setupConfig) {
       setupLabel = 'light';
@@ -121,14 +138,6 @@ export const reviewPRCommand = createCmd({
       useStaged: false,
     });
 
-    const diffTokens = estimateTokenCount(prDiff);
-
-    if (diffTokens > MAX_DIFF_TOKENS) {
-      showErrorAndExit(
-        `❌ PR has ${formatNum(diffTokens)} tokens in the diff (max allowed: ${formatNum(MAX_DIFF_TOKENS)})`,
-      );
-    }
-
     const mode: 'gh-actions' | 'test' =
       isGitHubActions && !test ? 'gh-actions' : 'test';
 
@@ -138,6 +147,40 @@ export const reviewPRCommand = createCmd({
       mode,
       additionalInstructions: undefined,
     };
+
+    if (!prDiff.trim()) {
+      console.log(
+        'ℹ️ No reviewable code changes found after filtering import/export-only changes.',
+      );
+      const skippedUsage = createZeroTokenUsage('validator-skipped');
+      const reviewContent = await formatValidatedReview(
+        {
+          summary:
+            'No reviewable code changes found after filtering import/export-only changes.',
+          issues: [],
+          usage: skippedUsage,
+        },
+        prData.author.login,
+        context,
+        prData.headRefName,
+        {
+          reviews: [],
+          validatorUsage: skippedUsage,
+        },
+      );
+      const outputFile = mode === 'test' ? 'pr-review-test.md' : 'pr-review.md';
+      await writeFile(outputFile, reviewContent);
+      await handleOutput(context, reviewContent, outputFile);
+      return;
+    }
+
+    const diffTokens = estimateTokenCount(prDiff);
+
+    if (diffTokens > MAX_DIFF_TOKENS) {
+      showErrorAndExit(
+        `❌ PR has ${formatNum(diffTokens)} tokens in the diff (max allowed: ${formatNum(MAX_DIFF_TOKENS)})`,
+      );
+    }
 
     const shouldRunPreviousCheck = !skipPreviousCheck && mode === 'gh-actions';
 
@@ -166,6 +209,7 @@ export const reviewPRCommand = createCmd({
         index + 1,
         model,
         config.reviewInstructionsPath,
+        config.includeAgentsFileInReviewPrompt,
       ),
     );
 
@@ -178,9 +222,7 @@ export const reviewPRCommand = createCmd({
 
     if (
       previousReviewResult.status === 'fulfilled' &&
-      previousReviewResult.value !== null &&
-      previousReviewResult.value.usage.totalTokens > 0 &&
-      !previousReviewResult.value.content.trim().includes('No issues found')
+      previousReviewResult.value !== null
     ) {
       successfulReviews.push(previousReviewResult.value);
     }
@@ -197,9 +239,7 @@ export const reviewPRCommand = createCmd({
       showErrorAndExit('All reviewers failed - cannot proceed with review');
     }
 
-    console.log('\n');
-
-    console.log('📥 Fetching human review comments...');
+    console.log('\n📥 Fetching human review comments...');
     let humanComments;
     try {
       humanComments = await github.getAllHumanPRComments(pr);
@@ -210,7 +250,7 @@ export const reviewPRCommand = createCmd({
       console.warn('⚠️ Failed to fetch human comments:', error);
     }
 
-    console.log('🔍 Running feedback checker to validate findings...');
+    console.log('🔍 Running validator to consolidate findings...');
     const validatedReview = await reviewValidator(
       context,
       successfulReviews,
@@ -219,25 +259,20 @@ export const reviewPRCommand = createCmd({
       prDiff,
       humanComments,
       setupConfig.validator,
-      setupConfig.formatter,
       config.reviewInstructionsPath,
     );
     console.log(
       `✅ Validation complete - found ${validatedReview.issues.length} validated issues`,
     );
+    logValidatedIssueSummary(validatedReview);
 
     const reviewsUsage = calculateReviewsUsage(successfulReviews);
     const totalUsage = calculateTotalUsage([
       ...successfulReviews.map((review) => review.usage),
       validatedReview.usage,
-      validatedReview.formatterUsage,
     ]);
 
-    logTokenUsageBreakdown(
-      reviewsUsage,
-      validatedReview.usage,
-      validatedReview.formatterUsage,
-    );
+    logTokenUsageBreakdown(reviewsUsage, validatedReview.usage);
 
     console.log(
       dedent`
@@ -258,13 +293,31 @@ export const reviewPRCommand = createCmd({
       {
         reviews: successfulReviews,
         validatorUsage: validatedReview.usage,
-        formatterUsage: validatedReview.formatterUsage,
       },
     );
 
     const outputFile = mode === 'test' ? 'pr-review-test.md' : 'pr-review.md';
     await writeFile(outputFile, reviewContent);
 
-    await handleOutput(context, reviewContent);
+    if (logsDir) {
+      const runLogsPath = await persistReviewRunLogs({
+        logsDir,
+        command: 'review-pr',
+        context,
+        setupId: setupLabel ?? setupConfig.reviewers.length.toString(),
+        branchName: prData.headRefName,
+        runStartedAt,
+        runEndedAt: new Date(),
+        changedFiles,
+        prDiff,
+        reviews: successfulReviews,
+        validatedReview,
+        finalReviewMarkdown: reviewContent,
+        outputFilePath: outputFile,
+      });
+      console.log(`🗂️ Review logs saved to ${runLogsPath}`);
+    }
+
+    await handleOutput(context, reviewContent, outputFile);
   },
 });
