@@ -31,6 +31,13 @@ export type SetupConfig = {
 };
 
 /**
+ * Review concurrency settings.
+ * - number: applies the same concurrency limit to all providers
+ * - object: sets per-provider concurrency limits (fallback for unspecified providers is unlimited)
+ */
+export type ReviewConcurrencyConfig = number | Record<string, number>;
+
+/**
  * Context provided to scope's getFiles function with all available file lists.
  */
 export type ScopeContext = {
@@ -126,6 +133,21 @@ export type ReviewCodeChangesConfig = {
    * Config value takes precedence over env var.
    */
   logsDir?: string;
+
+  /**
+   * Concurrency limit for running independent reviewer models.
+   *
+   * - `number`: same limit for all providers
+   * - `Record<string, number>`: per-provider limits keyed by provider id
+   *
+   * Provider ids come from `model.provider` (for example, `openai.responses` and `google.generative-ai`).
+   * Unspecified providers default to unlimited concurrency.
+   *
+   * @default Number.POSITIVE_INFINITY
+   * @example 2
+   * @example { 'openai.responses': 2, 'google.generative-ai': 1 }
+   */
+  concurrencyPerProvider?: ReviewConcurrencyConfig;
 };
 
 export type CreatePRConfig = {

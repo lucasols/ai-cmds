@@ -3,6 +3,7 @@ export {
   type Config,
   type CreatePRConfig,
   type CustomModelConfig,
+  type ReviewConcurrencyConfig,
   type ReviewCodeChangesConfig,
   type ScopeConfig,
   type ScopeContext,

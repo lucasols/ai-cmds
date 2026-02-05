@@ -1,4 +1,5 @@
 import { cliInput, createCmd } from '@ls-stack/cli';
+import { createAsyncQueueWithMeta } from '@ls-stack/utils/asyncQueue';
 import { dedent } from '@ls-stack/utils/dedent';
 import { mkdir, writeFile } from 'fs/promises';
 import { dirname } from 'path';
@@ -6,6 +7,7 @@ import { estimateTokenCount } from 'tokenx';
 import {
   getExcludePatterns,
   loadConfig,
+  type ReviewConcurrencyConfig,
   resolveBaseBranch,
   resolveLogsDir,
   type ScopeConfig,
@@ -49,8 +51,80 @@ type ResolvedComparisonBaseRef = {
   source: 'remote' | 'local';
 };
 
+type ProviderReviewer = {
+  reviewerId: number;
+  model: ReviewSetupConfig['reviewers'][number];
+};
+
+type ProviderQueueResult = {
+  providerId: string;
+  reviews: IndividualReview[];
+  failures: Array<{
+    reviewerId: number;
+    error: unknown;
+  }>;
+};
+
 function parseFiles(output: string): string[] {
   return output.trim().split('\n').filter(Boolean);
+}
+
+function getModelProviderId(modelConfig: ProviderReviewer['model']): string {
+  const model = modelConfig.model;
+  if (typeof model === 'string') {
+    return 'unknown';
+  }
+  return model.provider;
+}
+
+function isValidConcurrencyLimit(value: number): boolean {
+  return (
+    value === Number.POSITIVE_INFINITY || (Number.isInteger(value) && value > 0)
+  );
+}
+
+function validateConcurrencyPerProvider(
+  concurrencyPerProvider: ReviewConcurrencyConfig | undefined,
+): void {
+  if (concurrencyPerProvider === undefined) {
+    return;
+  }
+
+  if (typeof concurrencyPerProvider === 'number') {
+    if (!isValidConcurrencyLimit(concurrencyPerProvider)) {
+      showErrorAndExit(
+        `Invalid codeReview.concurrencyPerProvider value: ${concurrencyPerProvider}. Use a positive integer or Number.POSITIVE_INFINITY.`,
+      );
+    }
+    return;
+  }
+
+  for (const [providerId, limit] of Object.entries(concurrencyPerProvider)) {
+    if (!isValidConcurrencyLimit(limit)) {
+      showErrorAndExit(
+        `Invalid codeReview.concurrencyPerProvider["${providerId}"] value: ${limit}. Use a positive integer or Number.POSITIVE_INFINITY.`,
+      );
+    }
+  }
+}
+
+function resolveProviderConcurrency(
+  concurrencyPerProvider: ReviewConcurrencyConfig | undefined,
+  providerId: string,
+): number {
+  if (concurrencyPerProvider === undefined) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  if (typeof concurrencyPerProvider === 'number') {
+    return concurrencyPerProvider;
+  }
+
+  return concurrencyPerProvider[providerId] ?? Number.POSITIVE_INFINITY;
+}
+
+function formatConcurrencyLimit(limit: number): string {
+  return limit === Number.POSITIVE_INFINITY ? '∞' : String(limit);
 }
 
 async function writeReviewFile(outputFilePath: string, content: string) {
@@ -217,6 +291,7 @@ export const reviewCodeChangesCommand = createCmd({
     const runStartedAt = new Date();
     const rootConfig = await loadConfig();
     const config = rootConfig.codeReview ?? {};
+    validateConcurrencyPerProvider(config.concurrencyPerProvider);
     const outputFile = output ?? config.reviewOutputPath ?? 'pr-review.md';
     const logsDir = resolveLogsDir(config);
 
@@ -400,28 +475,101 @@ export const reviewCodeChangesCommand = createCmd({
       `🔍 Running ${setupConfig.reviewers.length} independent reviews...`,
     );
 
-    const reviewPromises = setupConfig.reviewers.map((model, index) =>
-      runSingleReview(
-        context,
-        null,
-        changedFiles,
-        prDiff,
-        index + 1,
-        model,
-        config.reviewInstructionsPath,
-        config.includeAgentsFileInReviewPrompt,
-      ),
-    );
+    const reviewersByProvider = new Map<string, ProviderReviewer[]>();
+    for (const [index, model] of setupConfig.reviewers.entries()) {
+      const reviewerId = index + 1;
+      const providerId = getModelProviderId(model);
 
-    const successfulReviews: IndividualReview[] = [];
-    const results = await Promise.allSettled(reviewPromises);
-    for (const result of results) {
-      if (result.status === 'fulfilled') {
-        successfulReviews.push(result.value);
+      const providerReviewers = reviewersByProvider.get(providerId);
+      if (providerReviewers) {
+        providerReviewers.push({ reviewerId, model });
       } else {
-        console.error('Review failed:', result.reason);
+        reviewersByProvider.set(providerId, [{ reviewerId, model }]);
       }
     }
+
+    console.log(
+      `📊 Running queues for ${reviewersByProvider.size} provider(s)`,
+    );
+
+    const providerQueuePromises: Promise<ProviderQueueResult>[] = [];
+    for (const [providerId, providerReviewers] of reviewersByProvider) {
+      const providerConcurrency = resolveProviderConcurrency(
+        config.concurrencyPerProvider,
+        providerId,
+      );
+      console.log(
+        `🔄 Provider "${providerId}": ${providerReviewers.length} reviewer(s), concurrency ${formatConcurrencyLimit(providerConcurrency)}`,
+      );
+
+      const queue = createAsyncQueueWithMeta<
+        IndividualReview,
+        { reviewerId: number; providerId: string }
+      >({ concurrency: providerConcurrency });
+
+      for (const reviewer of providerReviewers) {
+        void queue.resultifyAdd(
+          () =>
+            runSingleReview(
+              context,
+              null,
+              changedFiles,
+              prDiff,
+              reviewer.reviewerId,
+              reviewer.model,
+              config.reviewInstructionsPath,
+              config.includeAgentsFileInReviewPrompt,
+            ),
+          {
+            meta: { reviewerId: reviewer.reviewerId, providerId },
+          },
+        );
+      }
+
+      providerQueuePromises.push(
+        queue.onIdle().then(() => ({
+          providerId,
+          reviews: queue.completions.map((completion) => completion.value),
+          failures: queue.failures.map((failure) => ({
+            reviewerId: failure.meta.reviewerId,
+            error: failure.error,
+          })),
+        })),
+      );
+    }
+
+    const successfulReviews: IndividualReview[] = [];
+    const queueResults = await Promise.allSettled(providerQueuePromises);
+
+    for (const queueResult of queueResults) {
+      if (queueResult.status !== 'fulfilled') {
+        console.error('Provider queue failed:', queueResult.reason);
+        continue;
+      }
+
+      successfulReviews.push(...queueResult.value.reviews);
+      for (const failure of queueResult.value.failures) {
+        console.error(
+          `Review ${failure.reviewerId} failed on provider "${queueResult.value.providerId}":`,
+          failure.error,
+        );
+      }
+    }
+
+    successfulReviews.sort((a, b) => {
+      const aId =
+        typeof a.reviewerId === 'number' ?
+          a.reviewerId
+        : Number.POSITIVE_INFINITY;
+      const bId =
+        typeof b.reviewerId === 'number' ?
+          b.reviewerId
+        : Number.POSITIVE_INFINITY;
+      if (aId !== bId) {
+        return aId - bId;
+      }
+      return String(a.reviewerId).localeCompare(String(b.reviewerId));
+    });
 
     if (successfulReviews.length === 0) {
       showErrorAndExit('All reviewers failed - cannot proceed with review');

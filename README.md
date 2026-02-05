@@ -9,6 +9,7 @@ AI-powered CLI tool that uses OpenAI and Google Gemini models to review code cha
 - Custom setups with full control over reviewer and validator models
 - Three commands: `review-code-changes` for local development, `review-pr` for CI, `create-pr` for PR creation
 - Parallel reviews with a single structured validation pass for higher accuracy
+- Optional provider-aware concurrency limits for reviewer fan-out
 - AI-generated PR titles and descriptions
 - Automatic filtering of import-only changes
 - Custom review instructions support
@@ -183,6 +184,10 @@ export default defineConfig({
     codeReviewDiffExcludePatterns: ['pnpm-lock.yaml', '**/*.svg', '**/*.test.ts'],
     reviewInstructionsPath: '.github/PR_REVIEW_AGENT.md',
     includeAgentsFileInReviewPrompt: true,
+    concurrencyPerProvider: {
+      'openai.responses': 2,
+      'google.generative-ai': 1,
+    },
   },
   createPR: {
     baseBranch: 'main',
@@ -233,6 +238,7 @@ By default, `.env` is loaded automatically before the config file is imported, a
 | `setup` | Array of custom named setups (see below) |
 | `scope` | Array of custom named scopes (see below) |
 | `defaultValidator` | Default validator model for custom setups |
+| `concurrencyPerProvider` | Reviewer concurrency limit. Use a number for all providers or `{ [providerId]: number }` for per-provider limits (keys come from `model.provider`, e.g. `openai.responses`; unspecified providers default to unlimited) |
 | `logsDir` | Directory for review run artifacts (can also use `AI_CLI_LOGS_DIR` env var) |
 
 #### `createPR` Options
