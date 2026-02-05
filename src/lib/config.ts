@@ -1,6 +1,6 @@
+import type { JSONValue, LanguageModel } from 'ai';
 import { existsSync } from 'fs';
 import { join } from 'path';
-import type { LanguageModel, JSONValue } from 'ai';
 
 /**
  * Configuration for a custom AI model used in code review.
@@ -48,6 +48,7 @@ export type ScopeConfig = {
   label: string;
   /** Function that receives available file lists and returns the files to review */
   getFiles: (ctx: ScopeContext) => string[] | Promise<string[]>;
+  showFileCount?: boolean;
 };
 
 export type ReviewCodeChangesConfig = {

@@ -77,12 +77,17 @@ export function getAvailableScopes(config: ReviewCodeChangesConfig): string[] {
 
 /**
  * Attempts to get file count synchronously from a scope.
- * Returns null if the getFiles function returns a Promise.
+ * Returns null if showFileCount is falsy or if getFiles returns a Promise.
+ * When showFileCount is falsy, getFiles is not called (lazy evaluation).
  */
 export function tryGetFileCountSync(
   scope: ScopeConfig,
   ctx: ScopeContext,
 ): number | null {
+  if (!scope.showFileCount) {
+    return null;
+  }
+
   try {
     const result = scope.getFiles(ctx);
     if (Array.isArray(result)) {
