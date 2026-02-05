@@ -234,7 +234,7 @@ export async function loadConfig(cwd: string = process.cwd()): Promise<Config> {
     return cachedConfig;
   }
 
-  const configPath = join(cwd, 'ai-cli.config.ts');
+  const configPath = join(cwd, 'ai-cmds.config.ts');
   const defaultEnvPath = join(cwd, '.env');
 
   // Load default .env file first so config module can access env vars

@@ -169,7 +169,7 @@ This requires an open PR for the current branch. It uses the GitHub GraphQL API 
 
 ## Configuration
 
-Create `ai-cli.config.ts` in your project root:
+Create `ai-cmds.config.ts` in your project root:
 
 ```typescript
 import { defineConfig } from 'ai-cmds';

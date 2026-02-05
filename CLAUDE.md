@@ -39,7 +39,7 @@ src/
 │       ├── output.ts            # Result formatting, PR comments, token accounting
 │       └── types.ts             # TypeScript types
 └── lib/
-    ├── config.ts                # Loads ai-cli.config.ts from project root
+    ├── config.ts                # Loads ai-cmds.config.ts from project root
     ├── git.ts                   # Git operations (diff, changed files)
     ├── github.ts                # GitHub API via `gh` CLI
     ├── shell.ts                 # Command execution wrapper
@@ -48,7 +48,7 @@ src/
 
 **Review Flow:**
 
-1. Load config from `ai-cli.config.ts`
+1. Load config from `ai-cmds.config.ts`
 2. Fetch diff based on scope (pr/staged/all)
 3. Run parallel AI reviews using configured setup
 4. Validate findings with separate model pass
@@ -64,7 +64,7 @@ src/
 
 ## Configuration
 
-Projects using this CLI create `ai-cli.config.ts`:
+Projects using this CLI create `ai-cmds.config.ts`:
 
 ```typescript
 import { defineConfig } from 'ai-cmds';

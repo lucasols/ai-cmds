@@ -50,7 +50,7 @@ describe('loadDotEnv', () => {
       'TEST_CUSTOM_VAR=custom_value\nTEST_OVERRIDE_VAR=from_custom\n',
     );
     writeFileSync(
-      join(testDir, 'ai-cli.config.ts'),
+      join(testDir, 'ai-cmds.config.ts'),
       `export default { loadDotEnv: ['.env.local', '.env.custom'] };`,
     );
 
