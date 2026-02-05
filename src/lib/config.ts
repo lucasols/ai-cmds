@@ -1,4 +1,5 @@
 import type { JSONValue, LanguageModel } from 'ai';
+import { config as dotenvConfig } from 'dotenv';
 import { existsSync } from 'fs';
 import { join } from 'path';
 
@@ -118,6 +119,31 @@ export type Config = {
    * Configuration for the review-code-changes command.
    */
   reviewCodeChanges?: ReviewCodeChangesConfig;
+
+  /**
+   * Controls loading of environment variables from `.env` files.
+   *
+   * By default, a `.env` file in the project root is loaded automatically before
+   * the config module is imported, allowing the config to reference env vars.
+   *
+   * - `true` (default): Load `.env` from project root
+   * - `false`: Skip loading any `.env` files
+   * - `string`: Path to a specific `.env` file to load (in addition to the default `.env`)
+   * - `string[]`: Array of paths to load in order (in addition to the default `.env`)
+   *
+   * @example
+   * // Load additional environment file
+   * loadDotEnv: '.env.local'
+   *
+   * @example
+   * // Load multiple files (later files override earlier ones)
+   * loadDotEnv: ['.env', '.env.local', '.env.development']
+   *
+   * @example
+   * // Disable automatic .env loading
+   * loadDotEnv: false
+   */
+  loadDotEnv?: boolean | string | string[];
 };
 
 export function defineConfig(config: Config): Config {
@@ -125,6 +151,36 @@ export function defineConfig(config: Config): Config {
 }
 
 let cachedConfig: Config | undefined = undefined;
+let configImportCounter = 0;
+
+function loadEnvFile(filePath: string, override = false): boolean {
+  if (!existsSync(filePath)) {
+    return false;
+  }
+
+  dotenvConfig({ path: filePath, override });
+  return true;
+}
+
+function loadDotEnvFiles(config: Config, cwd: string): void {
+  const { loadDotEnv } = config;
+
+  if (loadDotEnv === false) {
+    return;
+  }
+
+  // Additional env files should override existing values
+  if (typeof loadDotEnv === 'string') {
+    loadEnvFile(join(cwd, loadDotEnv), true);
+    return;
+  }
+
+  if (Array.isArray(loadDotEnv)) {
+    for (const envPath of loadDotEnv) {
+      loadEnvFile(join(cwd, envPath), true);
+    }
+  }
+}
 
 export async function loadConfig(cwd: string = process.cwd()): Promise<Config> {
   if (cachedConfig !== undefined) {
@@ -132,6 +188,10 @@ export async function loadConfig(cwd: string = process.cwd()): Promise<Config> {
   }
 
   const configPath = join(cwd, 'ai-cli.config.ts');
+  const defaultEnvPath = join(cwd, '.env');
+
+  // Load default .env file first so config module can access env vars
+  loadEnvFile(defaultEnvPath);
 
   if (!existsSync(configPath)) {
     cachedConfig = {};
@@ -139,8 +199,14 @@ export async function loadConfig(cwd: string = process.cwd()): Promise<Config> {
   }
 
   try {
-    const configModule = (await import(configPath)) as { default?: Config };
+    // Add cache-busting query parameter to force Node.js to re-import
+    const importPath = `${configPath}?v=${configImportCounter++}`;
+    const configModule = (await import(importPath)) as { default?: Config };
     cachedConfig = configModule.default ?? {};
+
+    // Load additional env files specified in config
+    loadDotEnvFiles(cachedConfig, cwd);
+
     return cachedConfig;
   } catch (error) {
     console.warn(`Warning: Failed to load config from ${configPath}:`, error);
