@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { createCLI } from '@ls-stack/cli';
 import { createPRCommand } from './commands/create-pr/index.ts';
 import { reviewCodeChangesCommand } from './commands/review-code-changes/index.ts';

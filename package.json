@@ -20,9 +20,12 @@
     "dist"
   ],
   "type": "module",
-  "repository": "github:lucaslos/ai-cli",
+  "repository": "github:lucaslos/ai-cmds",
   "author": "Lucas Santos",
   "main": "./dist/main.js",
+  "bin": {
+    "ai-cmds": "./dist/main.js"
+  },
   "exports": {
     ".": {
       "import": "./dist/index.js",
