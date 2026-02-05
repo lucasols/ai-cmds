@@ -85,6 +85,7 @@ ai-cmds review-pr --pr 123 --setup heavy
 - In GitHub Actions (`GITHUB_ACTIONS` env set): Posts review as PR comment
 - With `--test` flag or locally: Saves review to `pr-review-test.md`
 - If the filtered diff has no reviewable code (for example import/export-only changes), the command skips AI calls and emits a no-issues review
+- Reviewer fan-out respects `codeReview.concurrencyPerProvider` when configured
 
 **Previous Review Check:**
 

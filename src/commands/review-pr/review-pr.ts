@@ -1,10 +1,12 @@
 import { createCmd } from '@ls-stack/cli';
+import { createAsyncQueueWithMeta } from '@ls-stack/utils/asyncQueue';
 import { dedent } from '@ls-stack/utils/dedent';
 import { writeFile } from 'fs/promises';
 import { estimateTokenCount } from 'tokenx';
 import {
   getExcludePatterns,
   loadConfig,
+  type ReviewConcurrencyConfig,
   resolveLogsDir,
 } from '../../lib/config.ts';
 import { formatNum } from '../../lib/diff.ts';
@@ -35,6 +37,85 @@ import {
 import type { IndividualReview, PRReviewContext } from '../shared/types.ts';
 
 const MAX_DIFF_TOKENS = 60_000;
+
+type ProviderReviewTask = {
+  reviewerId: IndividualReview['reviewerId'];
+  model: ReviewSetupConfig['reviewers'][number];
+};
+
+type ProviderQueueResult = {
+  providerId: string;
+  reviews: IndividualReview[];
+  failures: Array<{
+    reviewerId: IndividualReview['reviewerId'];
+    error: unknown;
+  }>;
+};
+
+function getModelProviderId(modelConfig: ProviderReviewTask['model']): string {
+  const model = modelConfig.model;
+  if (typeof model === 'string') {
+    return 'unknown';
+  }
+  return model.provider;
+}
+
+function isValidConcurrencyLimit(value: number): boolean {
+  return (
+    value === Number.POSITIVE_INFINITY || (Number.isInteger(value) && value > 0)
+  );
+}
+
+function validateConcurrencyPerProvider(
+  concurrencyPerProvider: ReviewConcurrencyConfig | undefined,
+): void {
+  if (concurrencyPerProvider === undefined) {
+    return;
+  }
+
+  if (typeof concurrencyPerProvider === 'number') {
+    if (!isValidConcurrencyLimit(concurrencyPerProvider)) {
+      showErrorAndExit(
+        `Invalid codeReview.concurrencyPerProvider value: ${concurrencyPerProvider}. Use a positive integer or Number.POSITIVE_INFINITY.`,
+      );
+    }
+    return;
+  }
+
+  for (const [providerId, limit] of Object.entries(concurrencyPerProvider)) {
+    if (!isValidConcurrencyLimit(limit)) {
+      showErrorAndExit(
+        `Invalid codeReview.concurrencyPerProvider["${providerId}"] value: ${limit}. Use a positive integer or Number.POSITIVE_INFINITY.`,
+      );
+    }
+  }
+}
+
+function resolveProviderConcurrency(
+  concurrencyPerProvider: ReviewConcurrencyConfig | undefined,
+  providerId: string,
+): number {
+  if (concurrencyPerProvider === undefined) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  if (typeof concurrencyPerProvider === 'number') {
+    return concurrencyPerProvider;
+  }
+
+  return concurrencyPerProvider[providerId] ?? Number.POSITIVE_INFINITY;
+}
+
+function formatConcurrencyLimit(limit: number): string {
+  return limit === Number.POSITIVE_INFINITY ? '∞' : String(limit);
+}
+
+function reviewerSortOrder(reviewerId: IndividualReview['reviewerId']): number {
+  if (reviewerId === 'previous-review-checker') {
+    return 0;
+  }
+  return reviewerId + 1;
+}
 
 export const reviewPRCommand = createCmd({
   description: 'Review a GitHub PR with AI',
@@ -80,6 +161,7 @@ export const reviewPRCommand = createCmd({
 
     const rootConfig = await loadConfig();
     const config = rootConfig.codeReview ?? {};
+    validateConcurrencyPerProvider(config.concurrencyPerProvider);
     const logsDir = resolveLogsDir(config);
 
     const isGitHubActions = Boolean(process.env.GITHUB_ACTIONS);
@@ -184,56 +266,137 @@ export const reviewPRCommand = createCmd({
 
     const shouldRunPreviousCheck = !skipPreviousCheck && mode === 'gh-actions';
 
-    console.log(
-      `🔍 Running ${setupConfig.reviewers.length} independent reviews...`,
-    );
+    const totalReviewers =
+      setupConfig.reviewers.length + (shouldRunPreviousCheck ? 1 : 0);
+    console.log(`🔍 Running ${totalReviewers} independent reviews...`);
 
-    const previousReviewPromise =
-      shouldRunPreviousCheck ?
-        runPreviousReviewCheck(
-          context,
-          prData,
-          changedFiles,
-          prDiff,
-          setupConfig.validator,
-          config.reviewInstructionsPath,
-        )
-      : Promise.resolve(null);
+    const reviewersByProvider = new Map<string, ProviderReviewTask[]>();
+    for (const [index, model] of setupConfig.reviewers.entries()) {
+      const reviewerId = index + 1;
+      const providerId = getModelProviderId(model);
 
-    const reviewPromises = setupConfig.reviewers.map((model, index) =>
-      runSingleReview(
-        context,
-        prData,
-        changedFiles,
-        prDiff,
-        index + 1,
-        model,
-        config.reviewInstructionsPath,
-        config.includeAgentsFileInReviewPrompt,
-      ),
-    );
-
-    const [previousReviewResult, ...reviewResults] = await Promise.allSettled([
-      previousReviewPromise,
-      ...reviewPromises,
-    ]);
-
-    const successfulReviews: IndividualReview[] = [];
-
-    if (
-      previousReviewResult.status === 'fulfilled' &&
-      previousReviewResult.value !== null
-    ) {
-      successfulReviews.push(previousReviewResult.value);
-    }
-
-    for (const result of reviewResults) {
-      if (result.status === 'fulfilled') {
-        successfulReviews.push(result.value);
+      const providerReviewers = reviewersByProvider.get(providerId);
+      if (providerReviewers) {
+        providerReviewers.push({ reviewerId, model });
       } else {
-        console.error('Review failed:', result.reason);
+        reviewersByProvider.set(providerId, [{ reviewerId, model }]);
       }
     }
+
+    if (shouldRunPreviousCheck) {
+      const previousCheckProviderId = getModelProviderId(setupConfig.validator);
+      const providerReviewers = reviewersByProvider.get(
+        previousCheckProviderId,
+      );
+      if (providerReviewers) {
+        providerReviewers.push({
+          reviewerId: 'previous-review-checker',
+          model: setupConfig.validator,
+        });
+      } else {
+        reviewersByProvider.set(previousCheckProviderId, [
+          {
+            reviewerId: 'previous-review-checker',
+            model: setupConfig.validator,
+          },
+        ]);
+      }
+    }
+
+    console.log(
+      `📊 Running queues for ${reviewersByProvider.size} provider(s)`,
+    );
+
+    const providerQueuePromises: Promise<ProviderQueueResult>[] = [];
+    for (const [providerId, providerReviewers] of reviewersByProvider) {
+      const providerConcurrency = resolveProviderConcurrency(
+        config.concurrencyPerProvider,
+        providerId,
+      );
+      console.log(
+        `🔄 Provider "${providerId}": ${providerReviewers.length} reviewer(s), concurrency ${formatConcurrencyLimit(providerConcurrency)}`,
+      );
+
+      const queue = createAsyncQueueWithMeta<
+        IndividualReview | null,
+        { reviewerId: IndividualReview['reviewerId']; providerId: string }
+      >({ concurrency: providerConcurrency });
+
+      for (const reviewer of providerReviewers) {
+        if (reviewer.reviewerId === 'previous-review-checker') {
+          void queue.resultifyAdd(
+            () =>
+              runPreviousReviewCheck(
+                context,
+                prData,
+                changedFiles,
+                prDiff,
+                reviewer.model,
+                config.reviewInstructionsPath,
+              ),
+            {
+              meta: { reviewerId: reviewer.reviewerId, providerId },
+            },
+          );
+          continue;
+        }
+
+        const reviewerId = reviewer.reviewerId;
+
+        void queue.resultifyAdd(
+          () =>
+            runSingleReview(
+              context,
+              prData,
+              changedFiles,
+              prDiff,
+              reviewerId,
+              reviewer.model,
+              config.reviewInstructionsPath,
+              config.includeAgentsFileInReviewPrompt,
+            ),
+          {
+            meta: { reviewerId, providerId },
+          },
+        );
+      }
+
+      providerQueuePromises.push(
+        queue.onIdle().then(() => ({
+          providerId,
+          reviews: queue.completions
+            .map((completion) => completion.value)
+            .filter((review): review is IndividualReview => review !== null),
+          failures: queue.failures.map((failure) => ({
+            reviewerId: failure.meta.reviewerId,
+            error: failure.error,
+          })),
+        })),
+      );
+    }
+
+    const successfulReviews: IndividualReview[] = [];
+    const queueResults = await Promise.allSettled(providerQueuePromises);
+
+    for (const queueResult of queueResults) {
+      if (queueResult.status !== 'fulfilled') {
+        console.error('Provider queue failed:', queueResult.reason);
+        continue;
+      }
+
+      successfulReviews.push(...queueResult.value.reviews);
+      for (const failure of queueResult.value.failures) {
+        console.error(
+          `Review ${failure.reviewerId} failed on provider "${queueResult.value.providerId}":`,
+          failure.error,
+        );
+      }
+    }
+
+    successfulReviews.sort(
+      (a, b) =>
+        reviewerSortOrder(a.reviewerId) - reviewerSortOrder(b.reviewerId),
+    );
 
     if (successfulReviews.length === 0) {
       showErrorAndExit('All reviewers failed - cannot proceed with review');
