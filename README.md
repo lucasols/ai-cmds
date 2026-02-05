@@ -173,8 +173,8 @@ import { defineConfig, BUILT_IN_SETUP_OPTIONS } from 'ai-cmds';
 export default defineConfig({
   reviewCodeChanges: {
     setup: [
-      ...BUILT_IN_SETUP_OPTIONS, // includes veryLight, light, medium, heavy
-      { label: 'myCustomSetup', reviewers: [...] },
+      ...BUILT_IN_SETUP_OPTIONS, // includes light, medium, heavy
+      { id: 'myCustomSetup', label: 'My Custom Setup', reviewers: [...] },
     ],
   },
 });
@@ -198,11 +198,13 @@ export default defineConfig({
   reviewCodeChanges: {
     scope: [
       {
-        label: 'src-only',
+        id: 'src-only',
+        label: 'Source files only',
         getFiles: (ctx) => ctx.allFiles.filter((f) => f.startsWith('src/')),
       },
       {
-        label: 'no-tests',
+        id: 'no-tests',
+        label: 'Exclude tests',
         getFiles: (ctx) => ctx.allFiles.filter((f) => !f.includes('.test.')),
       },
     ],
@@ -223,7 +225,7 @@ export default defineConfig({
   reviewCodeChanges: {
     scope: [
       ...BUILT_IN_SCOPE_OPTIONS, // includes all, staged
-      { label: 'src-only', getFiles: (ctx) => ctx.allFiles.filter((f) => f.startsWith('src/')) },
+      { id: 'src-only', label: 'Source files only', getFiles: (ctx) => ctx.allFiles.filter((f) => f.startsWith('src/')) },
     ],
   },
 });
