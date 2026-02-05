@@ -16,7 +16,7 @@
     {
       "label": "bump version and deploy",
       "type": "shell",
-      "command": "pnpm pre-publish && pnpm version ${input:version} && pnpm npm-publish",
+      "command": "pnpm exec @ls-stack/pkg-manager p",
       "problemMatcher": []
     },
     {
