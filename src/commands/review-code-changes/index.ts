@@ -221,9 +221,20 @@ export const reviewCodeChangesCommand = createCmd({
     const diffTokens = estimateTokenCount(prDiff);
 
     if (diffTokens > MAX_DIFF_TOKENS) {
-      showErrorAndExit(
-        `❌ Diff has ${formatNum(diffTokens)} tokens (max allowed: ${formatNum(MAX_DIFF_TOKENS)})`,
+      console.log(
+        `⚠️  Diff has ${formatNum(diffTokens)} tokens (max suggested: ${formatNum(MAX_DIFF_TOKENS)})`,
       );
+
+      const shouldContinue = await cliInput.confirm(
+        'Continue anyway? Large diffs may result in less accurate reviews',
+        {
+          initial: false,
+        },
+      );
+
+      if (!shouldContinue) {
+        process.exit(1);
+      }
     }
 
     const context: LocalReviewContext = {
