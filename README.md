@@ -7,9 +7,10 @@ AI-powered CLI tool that uses OpenAI and Google Gemini models to review code cha
 - Multiple AI models: GPT-5, GPT-5-mini, GPT-4o-mini, Gemini 2.5 Pro, Gemini 2.0 Flash
 - Configurable review setups from light to heavy
 - Custom setups with full control over reviewer and validator models
-- Four commands: `review-code-changes` for local development, `advanced-review-changes` for guided/customized local review focus, `review-pr` for CI, `create-pr` for PR creation
+- Five commands: `commit` for AI commit messages, `review-code-changes` for local development, `advanced-review-changes` for guided/customized local review focus, `review-pr` for CI, `create-pr` for PR creation
 - Parallel reviews with a single structured validation pass for higher accuracy
 - Optional provider-aware concurrency limits for reviewer fan-out
+- AI-generated commit messages with interactive editing
 - AI-generated PR titles and descriptions
 - Automatic filtering of import-only changes
 - Custom review instructions support
@@ -32,6 +33,27 @@ pnpm add ai-cmds
 - `GOOGLE_GENERATIVE_AI_API_KEY` environment variable (for Google setups)
 
 ## Commands
+
+### `commit` - AI Commit Messages
+
+Generate commit messages from staged changes using AI (Gemini primary, GPT-5-mini fallback).
+
+```bash
+# Generate commit message and commit
+ai-cmds commit
+
+# Preview message without committing
+ai-cmds commit --dry-run
+```
+
+**Arguments:**
+- `--dry-run` - Preview the generated message without committing
+
+**Behavior:**
+- If no files are staged, automatically stages all changes before generating
+- Lockfiles are excluded from the diff sent to AI by default
+- After generation, choose to: **Commit**, **Edit**, **Regenerate**, or **Cancel**
+- If the primary model fails, automatically retries with the fallback model
 
 ### `review-code-changes` - Local Development
 
@@ -224,6 +246,11 @@ export default defineConfig({
     diffExcludePatterns: ['pnpm-lock.yaml'],
     descriptionInstructions: 'Always mention Jira ticket if present in branch name',
   },
+  commit: {
+    maxDiffTokens: 10000,
+    excludePatterns: ['dist/**'],
+    instructions: 'Always include the Jira ticket number from the branch name',
+  },
 });
 ```
 
@@ -255,6 +282,7 @@ By default, `.env` is loaded automatically before the config file is imported, a
 | `loadDotEnv` | Controls `.env` file loading. `true` (default): load `.env`, `false`: skip, `string`: additional file path, `string[]`: multiple files (later override earlier) |
 | `codeReview` | Configuration for the review commands (see below) |
 | `createPR` | Configuration for the create-pr command (see below) |
+| `commit` | Configuration for the commit command (see below) |
 
 #### `codeReview` Options
 
@@ -281,6 +309,16 @@ By default, `.env` is loaded automatically before the config file is imported, a
 | `descriptionInstructions` | Custom instructions for AI description generation |
 | `diffExcludePatterns` | Glob patterns for files to exclude from diff |
 | `maxDiffTokens` | Maximum tokens from diff to include in AI prompt (default: 50000) |
+
+#### `commit` Options
+
+| Option | Description |
+|--------|-------------|
+| `primaryModel` | Custom AI model for commit message generation (default: Gemini 2.5 Flash) |
+| `fallbackModel` | Fallback AI model if primary fails (default: GPT-5-mini) |
+| `maxDiffTokens` | Maximum tokens from diff to include in AI prompt (default: 10000) |
+| `excludePatterns` | Additional glob patterns to exclude from diff (merged with default lockfile patterns) |
+| `instructions` | Custom instructions for AI commit message generation |
 
 When `codeReview.logsDir` (or `AI_CLI_LOGS_DIR`) is set, each review run stores artifacts under:
 

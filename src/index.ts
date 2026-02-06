@@ -1,5 +1,6 @@
 export {
   defineConfig,
+  type CommitConfig,
   type Config,
   type CreatePRConfig,
   type CustomModelConfig,
@@ -17,6 +18,7 @@ export {
 export { BUILT_IN_SETUP_OPTIONS } from './commands/shared/setups.ts';
 
 export { advancedReviewChangesCommand } from './commands/advanced-review-changes/advanced-review-changes.ts';
+export { commitCommand } from './commands/commit/commit.ts';
 export { createPRCommand } from './commands/create-pr/create-pr.ts';
 export { reviewCodeChangesCommand } from './commands/review-code-changes/review-code-changes.ts';
 export { reviewPRCommand } from './commands/review-pr/review-pr.ts';

@@ -147,6 +147,19 @@ export async function getRepoInfo(): Promise<{ owner: string; repo: string }> {
   };
 }
 
+export async function stageAll(): Promise<void> {
+  await runCmdUnwrap(['git', 'add', '-A'], { silent: true });
+}
+
+export async function commit(message: string): Promise<string> {
+  return runCmdUnwrap(['git', 'commit', '-m', message], { silent: true });
+}
+
+export async function hasChanges(): Promise<boolean> {
+  const output = await runCmdSilentUnwrap(['git', 'status', '--porcelain']);
+  return output.trim().length > 0;
+}
+
 export const git = {
   getCurrentBranch,
   getGitRoot,
@@ -159,4 +172,7 @@ export const git = {
   getRemoteUrl,
   getRepoInfo,
   getLocalBranches,
+  stageAll,
+  commit,
+  hasChanges,
 };

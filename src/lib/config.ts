@@ -193,6 +193,39 @@ export type CreatePRConfig = {
   maxDiffTokens?: number;
 };
 
+export type CommitConfig = {
+  /**
+   * Custom AI model for generating commit messages.
+   * Defaults to Google Gemini 2.5 Flash.
+   */
+  primaryModel?: CustomModelConfig;
+
+  /**
+   * Fallback AI model if the primary model fails.
+   * Defaults to OpenAI GPT-5-mini.
+   */
+  fallbackModel?: CustomModelConfig;
+
+  /**
+   * Maximum number of tokens from the diff to include in the AI prompt.
+   * @default 10000
+   */
+  maxDiffTokens?: number;
+
+  /**
+   * Additional glob patterns to exclude from the diff sent to AI.
+   * Merged with default lockfile patterns (package-lock.json, yarn.lock, etc.).
+   * @example ['dist/**', '*.generated.ts']
+   */
+  excludePatterns?: string[];
+
+  /**
+   * Custom instructions to include in the AI prompt for generating commit messages.
+   * @example 'Always include the Jira ticket number from the branch name'
+   */
+  instructions?: string;
+};
+
 export type Config = {
   /**
    * Configuration for the review-code-changes, advanced-review-changes, and
@@ -204,6 +237,11 @@ export type Config = {
    * Configuration for the create-pr command.
    */
   createPR?: CreatePRConfig;
+
+  /**
+   * Configuration for the commit command.
+   */
+  commit?: CommitConfig;
 
   /**
    * Controls loading of environment variables from `.env` files.
