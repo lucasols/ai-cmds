@@ -160,11 +160,7 @@ export const commitCommand = createCmd({
           await git.stageAll();
         }
         await git.commit(message);
-        console.log('\n✅ Changes committed successfully:');
-        for (const file of filesToReview) {
-          console.log(`   ${file}`);
-        }
-        console.log();
+        console.log('\n✅ Changes committed successfully.\n');
         return;
       }
 
@@ -203,11 +199,7 @@ export const commitCommand = createCmd({
         await git.stageAll();
       }
       await git.commit(message);
-      console.log('\n✅ Changes committed successfully:');
-      for (const file of filesToReview) {
-        console.log(`   ${file}`);
-      }
-      console.log();
+      console.log('\n✅ Changes committed successfully.\n');
       return;
     }
   },
