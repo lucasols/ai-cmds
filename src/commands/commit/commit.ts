@@ -92,7 +92,11 @@ export const commitCommand = createCmd({
         excludePatterns,
       );
 
-      console.log(`\n📊 ${filesToReview.length} file(s) changed\n`);
+      console.log(`\n📊 ${filesToReview.length} file(s) changed:`);
+      for (const file of filesToReview) {
+        console.log(`   ${file}`);
+      }
+      console.log();
 
       diff = await git.getUnstagedDiff({
         includeFiles: filteredFiles.length > 0 ? filteredFiles : undefined,
@@ -110,7 +114,11 @@ export const commitCommand = createCmd({
         excludePatterns,
       );
 
-      console.log(`\n📊 ${filesToReview.length} file(s) staged for commit\n`);
+      console.log(`\n📊 ${filesToReview.length} file(s) staged for commit:`);
+      for (const file of filesToReview) {
+        console.log(`   ${file}`);
+      }
+      console.log();
 
       diff = await git.getStagedDiff({
         includeFiles: filteredFiles.length > 0 ? filteredFiles : undefined,
