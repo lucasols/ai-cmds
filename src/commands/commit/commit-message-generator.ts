@@ -1,5 +1,11 @@
-import { generateObject, type JSONValue, type LanguageModel } from 'ai';
+import {
+  generateObject,
+  type GenerateObjectResult,
+  type JSONValue,
+  type LanguageModel,
+} from 'ai';
 import { z } from 'zod';
+import { formatNum } from '../../lib/diff.ts';
 import type { CommitConfig, CustomModelConfig } from '../../lib/config.ts';
 
 const commitMessageSchema = z.object({
@@ -104,6 +110,7 @@ export async function generateCommitMessage(
   try {
     console.log(`🤖 Generating commit message with ${primary.label}...`);
 
+    const primaryStart = performance.now();
     const result = await generateObject({
       model: primary.model,
       schema: commitMessageSchema,
@@ -111,6 +118,9 @@ export async function generateCommitMessage(
       prompt: userPrompt,
       providerOptions: primary.providerOptions,
     });
+    const primaryDuration = performance.now() - primaryStart;
+
+    logTokenUsage(primary.label, result.usage, primaryDuration);
 
     return formatCommitMessage(result.object);
   } catch {
@@ -122,6 +132,7 @@ export async function generateCommitMessage(
 
     console.log(`🤖 Generating commit message with ${fallback.label}...`);
 
+    const fallbackStart = performance.now();
     const result = await generateObject({
       model: fallback.model,
       schema: commitMessageSchema,
@@ -129,9 +140,26 @@ export async function generateCommitMessage(
       prompt: userPrompt,
       providerOptions: fallback.providerOptions,
     });
+    const fallbackDuration = performance.now() - fallbackStart;
+
+    logTokenUsage(fallback.label, result.usage, fallbackDuration);
 
     return formatCommitMessage(result.object);
   }
+}
+
+function logTokenUsage(
+  label: string,
+  usage: GenerateObjectResult<unknown>['usage'],
+  durationMs: number,
+): void {
+  const input = formatNum(usage.inputTokens ?? 0);
+  const output = formatNum(usage.outputTokens ?? 0);
+  const total = formatNum(usage.totalTokens ?? 0);
+  const seconds = (durationMs / 1000).toFixed(1);
+  console.log(
+    `📊 ${label} — ${seconds}s, tokens: ${input} in / ${output} out / ${total} total`,
+  );
 }
 
 function formatCommitMessage(message: {

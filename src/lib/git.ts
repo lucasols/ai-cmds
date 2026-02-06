@@ -147,6 +147,43 @@ export async function getRepoInfo(): Promise<{ owner: string; repo: string }> {
   };
 }
 
+export async function getUnstagedDiff(
+  options: {
+    includeFiles?: string[];
+    silent?: boolean;
+  } = {},
+): Promise<string> {
+  const { includeFiles, silent = true } = options;
+
+  const gitArgs = ['git', 'diff'];
+
+  if (includeFiles && includeFiles.length > 0) {
+    gitArgs.push('--', ...includeFiles);
+  }
+
+  return runCmdUnwrap(gitArgs, { silent });
+}
+
+export async function getChangedFilesUnstaged(): Promise<string[]> {
+  const modifiedOutput = await runCmdSilentUnwrap([
+    'git',
+    'diff',
+    '--name-only',
+  ]);
+
+  const untrackedOutput = await runCmdSilentUnwrap([
+    'git',
+    'ls-files',
+    '--others',
+    '--exclude-standard',
+  ]);
+
+  return [
+    ...modifiedOutput.trim().split('\n'),
+    ...untrackedOutput.trim().split('\n'),
+  ].filter(Boolean);
+}
+
 export async function stageAll(): Promise<void> {
   await runCmdUnwrap(['git', 'add', '-A'], { silent: true });
 }
@@ -165,7 +202,9 @@ export const git = {
   getGitRoot,
   getDiffToBranch,
   getStagedDiff,
+  getUnstagedDiff,
   getChangedFiles,
+  getChangedFilesUnstaged,
   getStagedFiles,
   fetchBranch,
   getCommitHash,

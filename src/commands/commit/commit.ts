@@ -1,5 +1,6 @@
 import { cliInput, createCmd } from '@ls-stack/cli';
 import { estimateTokenCount, sliceByTokens } from 'tokenx';
+import { formatNum } from '../../lib/diff.ts';
 import { loadConfig } from '../../lib/config.ts';
 import { git } from '../../lib/git.ts';
 import { showErrorAndExit } from '../../lib/shell.ts';
@@ -37,6 +38,12 @@ export const commitCommand = createCmd({
       name: 'dry-run',
       description: 'Preview generated message without committing',
     },
+    yes: {
+      type: 'flag',
+      name: 'yes',
+      description: 'Skip confirmation and commit immediately',
+      short: 'y',
+    },
   },
   examples: [
     { args: [], description: 'Generate commit message and commit' },
@@ -44,8 +51,12 @@ export const commitCommand = createCmd({
       args: ['--dry-run'],
       description: 'Preview commit message without committing',
     },
+    {
+      args: ['--yes'],
+      description: 'Generate and commit without confirmation',
+    },
   ],
-  run: async ({ dryRun }) => {
+  run: async ({ dryRun, yes }) => {
     const rootConfig = await loadConfig();
     const config = rootConfig.commit ?? {};
 
@@ -54,30 +65,58 @@ export const commitCommand = createCmd({
       showErrorAndExit('No changes to commit.');
     }
 
-    let stagedFiles = await git.getStagedFiles();
+    const stagedFiles = await git.getStagedFiles();
+    const needsStaging = stagedFiles.length === 0;
 
-    if (stagedFiles.length === 0) {
-      console.log('📂 No staged changes found. Staging all changes...');
-      await git.stageAll();
-      stagedFiles = await git.getStagedFiles();
+    let filesToReview: string[];
+    let diff: string;
 
-      if (stagedFiles.length === 0) {
-        showErrorAndExit('No changes to commit after staging.');
+    if (needsStaging) {
+      console.log(
+        '📂 No staged changes found. Will stage all changes on commit.',
+      );
+      const changedFiles = await git.getChangedFilesUnstaged();
+
+      if (changedFiles.length === 0) {
+        showErrorAndExit('No changes found to commit.');
       }
+
+      filesToReview = changedFiles;
+
+      const excludePatterns = [
+        ...DEFAULT_EXCLUDE_PATTERNS,
+        ...(config.excludePatterns ?? []),
+      ];
+      const filteredFiles = applyExcludePatterns(
+        filesToReview,
+        excludePatterns,
+      );
+
+      console.log(`\n📊 ${filesToReview.length} file(s) changed\n`);
+
+      diff = await git.getUnstagedDiff({
+        includeFiles: filteredFiles.length > 0 ? filteredFiles : undefined,
+        silent: true,
+      });
+    } else {
+      filesToReview = stagedFiles;
+
+      const excludePatterns = [
+        ...DEFAULT_EXCLUDE_PATTERNS,
+        ...(config.excludePatterns ?? []),
+      ];
+      const filteredFiles = applyExcludePatterns(
+        filesToReview,
+        excludePatterns,
+      );
+
+      console.log(`\n📊 ${filesToReview.length} file(s) staged for commit\n`);
+
+      diff = await git.getStagedDiff({
+        includeFiles: filteredFiles.length > 0 ? filteredFiles : undefined,
+        silent: true,
+      });
     }
-
-    console.log(`\n📊 ${stagedFiles.length} file(s) staged for commit\n`);
-
-    const excludePatterns = [
-      ...DEFAULT_EXCLUDE_PATTERNS,
-      ...(config.excludePatterns ?? []),
-    ];
-    const filteredFiles = applyExcludePatterns(stagedFiles, excludePatterns);
-
-    const diff = await git.getStagedDiff({
-      includeFiles: filteredFiles.length > 0 ? filteredFiles : undefined,
-      silent: true,
-    });
 
     if (!diff.trim()) {
       showErrorAndExit(
@@ -86,6 +125,8 @@ export const commitCommand = createCmd({
     }
 
     const maxTokens = config.maxDiffTokens ?? DEFAULT_MAX_DIFF_TOKENS;
+    const diffTokens = estimateTokenCount(diff);
+    console.log(`📝 Diff: ${formatNum(diffTokens)} tokens`);
     const truncatedDiff = truncateDiff(diff, maxTokens);
 
     let message = await generateCommitMessage(truncatedDiff, config);
@@ -99,6 +140,15 @@ export const commitCommand = createCmd({
 
       if (dryRun) {
         console.log('\n🔍 Dry run mode — commit not created.\n');
+        return;
+      }
+
+      if (yes) {
+        if (needsStaging) {
+          await git.stageAll();
+        }
+        await git.commit(message);
+        console.log('\n✅ Changes committed successfully.\n');
         return;
       }
 
@@ -129,6 +179,9 @@ export const commitCommand = createCmd({
       }
 
       // action === 'commit'
+      if (needsStaging) {
+        await git.stageAll();
+      }
       await git.commit(message);
       console.log('\n✅ Changes committed successfully.\n');
       return;
