@@ -4,11 +4,6 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "build:watch",
-      "type": "npm",
-      "script": "build:watch"
-    },
-    {
       "label": "run tests",
       "type": "npm",
       "script": "test:ui"
@@ -28,20 +23,17 @@
       }
     },
     {
-      "label": "tsc watch",
-      "type": "npm",
-      "script": "tsc:watch",
+      "label": "upgrade global install",
+      "type": "shell",
+      "command": "bun update -g ai-cmds --latest",
+      "problemMatcher": [],
+      "icon": {
+        "color": "terminal.ansiMagenta",
+        "id": "download"
+      },
       "presentation": {
         "clear": true
       }
-    }
-  ],
-  "inputs": [
-    {
-      "id": "version",
-      "type": "pickString",
-      "description": "Select version type",
-      "options": ["minor", "patch", "major"]
     }
   ]
 }
