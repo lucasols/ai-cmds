@@ -1,7 +1,7 @@
 import { tool } from 'ai';
 import { readFileSync } from 'fs';
 import { z } from 'zod';
-import { runCmd } from './shell.ts';
+import { runCmd } from '@ls-stack/node-utils/runShellCmd';
 
 const readFileInputSchema = z.object({
   filename: z.string().describe('Path to the file to read'),
@@ -71,17 +71,17 @@ export function createListDirectoryTool(reviewerId?: number | string) {
 
       const args =
         recursive ? ['ls', '-la', '-R', directory] : ['ls', '-la', directory];
-      const result = await runCmd(args, { silent: true });
+      const result = await runCmd(null, args, { silent: true });
 
       if (result.error) {
-        console.log(`🛠️ ${logPrefix} failed ❌ ${result.error.message}`);
-        return `Error listing directory ${directory}: ${result.error.message}`;
+        console.log(`🛠️ ${logPrefix} failed ❌ ${result.stderr}`);
+        return `Error listing directory ${directory}: ${result.stderr}`;
       }
 
       console.log(
         `🛠️ ${logPrefix} listed ${directory}${recursive ? ' (recursive)' : ''}`,
       );
-      return result.value.stdout;
+      return result.stdout;
     },
   });
 }
@@ -135,9 +135,9 @@ export function createRipgrepTool(reviewerId?: number | string) {
           args.push('--', filePattern);
         }
 
-        const result = await runCmd(args, { silent: true });
+        const result = await runCmd(null, args, { silent: true });
 
-        if (result.error && result.error.message.includes('no matches found')) {
+        if (result.error && result.stderr.includes('no matches found')) {
           console.log(
             `🛠️ ${logPrefix} searched for "${pattern}" - no matches found`,
           );
@@ -146,19 +146,19 @@ export function createRipgrepTool(reviewerId?: number | string) {
 
         if (result.error) {
           console.log(`🛠️ ${logPrefix} ❌ failed to search for "${pattern}"`);
-          return `Error searching for pattern "${pattern}": ${result.error.message}`;
+          return `Error searching for pattern "${pattern}": ${result.stderr}`;
         }
 
-        if (!result.value.stdout.trim()) {
+        if (!result.stdout.trim()) {
           console.log(
             `🛠️ ${logPrefix} searched for "${pattern}" - no matches found`,
           );
           return 'No matches found';
         }
 
-        const lines = result.value.stdout
+        const lines = result.stdout
           .split('\n')
-          .filter((line) => line.trim());
+          .filter((line: string) => line.trim());
         const limitedLines = maxResults ? lines.slice(0, maxResults) : lines;
         const output = limitedLines.join('\n');
 

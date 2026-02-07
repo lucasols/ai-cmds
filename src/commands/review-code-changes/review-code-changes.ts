@@ -15,7 +15,11 @@ import {
 } from '../../lib/config.ts';
 import { formatNum } from '../../lib/diff.ts';
 import { git } from '../../lib/git.ts';
-import { runCmdSilentUnwrap, showErrorAndExit } from '../../lib/shell.ts';
+import {
+  runCmdSilent,
+  runCmdSilentUnwrap,
+} from '@ls-stack/node-utils/runShellCmd';
+import { showErrorAndExit } from '../../lib/shell.ts';
 import { applyExcludePatterns, getDiffForFiles } from '../shared/diff-utils.ts';
 import {
   calculateReviewsUsage,
@@ -157,12 +161,15 @@ async function fetchChangedFilesAgainstRef(ref: string): Promise<string[]> {
 }
 
 async function refExists(ref: string): Promise<boolean> {
-  try {
-    await runCmdSilentUnwrap(['git', 'rev-parse', '--verify', '--quiet', ref]);
-    return true;
-  } catch {
-    return false;
-  }
+  const result = await runCmdSilent([
+    'git',
+    'rev-parse',
+    '--verify',
+    '--quiet',
+    ref,
+  ]);
+
+  return !result.error;
 }
 
 async function resolveComparisonBaseRef(
@@ -170,11 +177,18 @@ async function resolveComparisonBaseRef(
 ): Promise<ResolvedComparisonBaseRef> {
   const remoteRef = `origin/${baseBranch}`;
 
-  await runCmdSilentUnwrap(['git', 'fetch', 'origin', baseBranch]).catch(() => {
+  const fetchResult = await runCmdSilent([
+    'git',
+    'fetch',
+    'origin',
+    baseBranch,
+  ]);
+
+  if (fetchResult.error) {
     console.warn(
       `⚠️ Could not fetch origin/${baseBranch}. Falling back to local refs if needed.`,
     );
-  });
+  }
 
   if (await refExists(remoteRef)) {
     console.log(`📌 Using remote comparison ref: ${remoteRef}`);

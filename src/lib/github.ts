@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { runCmd, runCmdSilentUnwrap, runCmdUnwrap } from './shell.ts';
+import {
+  runCmd,
+  runCmdSilent,
+  runCmdUnwrap,
+} from '@ls-stack/node-utils/runShellCmd';
 import { git } from './git.ts';
 
 const prDataSchema = z.object({
@@ -26,37 +30,57 @@ const ghPRCommentSchema = z.object({
 
 export type GhPRComment = z.infer<typeof ghPRCommentSchema>;
 
-async function ghApi(endpoint: string, perPage = 100): Promise<string> {
+async function ghApiUnwrap(endpoint: string, perPage = 100): Promise<string> {
   const separator = endpoint.includes('?') ? '&' : '?';
   const endpointWithPerPage = `${endpoint}${separator}per_page=${perPage}`;
 
-  return runCmdUnwrap(['gh', 'api', endpointWithPerPage], {
+  const result = await runCmd(null, ['gh', 'api', endpointWithPerPage], {
     silent: true,
-    noColor: true,
+    noCiColorForce: true,
   });
+
+  if (result.error) {
+    throw new Error(result.stderr || `gh api call failed: ${endpoint}`);
+  }
+
+  return result.stdout;
+}
+
+async function ghJsonCmdUnwrap(command: string[]): Promise<string> {
+  const result = await runCmd(null, command, {
+    silent: true,
+    noCiColorForce: true,
+  });
+
+  if (result.error) {
+    throw new Error(result.stderr || 'gh command failed');
+  }
+
+  return result.stdout;
 }
 
 export async function getPRData(prNumber: string): Promise<PRData> {
-  const result = await runCmdUnwrap(
-    [
-      'gh',
-      'pr',
-      'view',
-      prNumber,
-      '--json',
-      'title,changedFiles,baseRefName,headRefName,author',
-    ],
-    { silent: true, noColor: true },
-  );
+  const result = await ghJsonCmdUnwrap([
+    'gh',
+    'pr',
+    'view',
+    prNumber,
+    '--json',
+    'title,changedFiles,baseRefName,headRefName,author',
+  ]);
 
   return prDataSchema.parse(JSON.parse(result));
 }
 
 export async function getChangedFiles(prNumber: string): Promise<string[]> {
-  const result = await runCmdUnwrap(
-    ['gh', 'pr', 'view', prNumber, '--json', 'files'],
-    { silent: true, noColor: true },
-  );
+  const result = await ghJsonCmdUnwrap([
+    'gh',
+    'pr',
+    'view',
+    prNumber,
+    '--json',
+    'files',
+  ]);
 
   const schema = z.object({
     files: z.array(z.object({ path: z.string() })),
@@ -70,7 +94,7 @@ export async function getPRIssueComments(
   prNumber: string,
 ): Promise<GhPRComment[]> {
   const { owner, repo } = await git.getRepoInfo();
-  const result = await ghApi(
+  const result = await ghApiUnwrap(
     `/repos/${owner}/${repo}/issues/${prNumber}/comments`,
   );
 
@@ -86,7 +110,7 @@ export async function createPRComment(
   await deletePRComments(prNumber, marker);
 
   // Create new comment
-  await runCmdUnwrap([
+  await runCmdUnwrap(null, [
     'gh',
     'pr',
     'comment',
@@ -101,7 +125,7 @@ export async function deletePRComments(
   marker: string,
 ): Promise<number> {
   const { owner, repo } = await git.getRepoInfo();
-  const result = await ghApi(
+  const result = await ghApiUnwrap(
     `/repos/${owner}/${repo}/issues/${prNumber}/comments`,
   );
 
@@ -124,15 +148,19 @@ export async function deletePRComments(
 
   let deletedCount = 0;
   for (const comment of commentsToDelete) {
-    const deleteResult = await runCmd([
-      'gh',
-      'api',
-      '--method',
-      'DELETE',
-      '-H',
-      'Accept: application/vnd.github+json',
-      `/repos/${owner}/${repo}/issues/comments/${comment.id}`,
-    ]);
+    const deleteResult = await runCmd(
+      null,
+      [
+        'gh',
+        'api',
+        '--method',
+        'DELETE',
+        '-H',
+        'Accept: application/vnd.github+json',
+        `/repos/${owner}/${repo}/issues/comments/${comment.id}`,
+      ],
+      { silent: true },
+    );
 
     if (!deleteResult.error) {
       deletedCount++;
@@ -228,23 +256,20 @@ export async function getUnviewedPRFiles(prNumber: string): Promise<string[]> {
       cursor,
     };
 
-    const result = await runCmdUnwrap(
-      [
-        'gh',
-        'api',
-        'graphql',
-        '-f',
-        `query=${query}`,
-        '-F',
-        `owner=${variables.owner}`,
-        '-F',
-        `repo=${variables.repo}`,
-        '-F',
-        `number=${variables.number}`,
-        ...(variables.cursor ? ['-F', `cursor=${variables.cursor}`] : []),
-      ],
-      { silent: true, noColor: true },
-    );
+    const result = await ghJsonCmdUnwrap([
+      'gh',
+      'api',
+      'graphql',
+      '-f',
+      `query=${query}`,
+      '-F',
+      `owner=${variables.owner}`,
+      '-F',
+      `repo=${variables.repo}`,
+      '-F',
+      `number=${variables.number}`,
+      ...(variables.cursor ? ['-F', `cursor=${variables.cursor}`] : []),
+    ]);
 
     const parsed = unviewedPRFilesResponseSchema.parse(JSON.parse(result));
     const { nodes, pageInfo } = parsed.data.repository.pullRequest.files;
@@ -324,34 +349,36 @@ export type ExistingPR = z.infer<typeof existingPRSchema>;
 export async function checkExistingPR(
   branch: string,
 ): Promise<ExistingPR | null> {
+  const result = await runCmd(
+    null,
+    ['gh', 'pr', 'view', branch, '--json', 'state,url,number'],
+    { silent: true, noCiColorForce: true },
+  );
+
+  if (result.error) {
+    return null;
+  }
+
   try {
-    const result = await runCmdUnwrap(
-      ['gh', 'pr', 'view', branch, '--json', 'state,url,number'],
-      { silent: true, noColor: true },
-    );
-    const parsed = existingPRSchema.parse(JSON.parse(result));
-    return parsed;
+    return existingPRSchema.parse(JSON.parse(result.stdout));
   } catch {
     return null;
   }
 }
 
 export async function checkBranchPushed(branch: string): Promise<boolean> {
-  try {
-    await runCmdSilentUnwrap([
-      'git',
-      'rev-parse',
-      '--verify',
-      `origin/${branch}`,
-    ]);
-    return true;
-  } catch {
-    return false;
-  }
+  const result = await runCmdSilent([
+    'git',
+    'rev-parse',
+    '--verify',
+    `origin/${branch}`,
+  ]);
+
+  return !result.error;
 }
 
 export async function pushBranch(branch: string): Promise<void> {
-  await runCmdUnwrap(['git', 'push', '-u', 'origin', branch]);
+  await runCmdUnwrap(null, ['git', 'push', '-u', 'origin', branch]);
 }
 
 export type CompareUrlParams = {

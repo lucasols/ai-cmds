@@ -2,7 +2,7 @@ import { writeFile } from 'fs/promises';
 import { styleText } from 'util';
 import { git } from '../../lib/git.ts';
 import { github } from '../../lib/github.ts';
-import { runCmdSilentUnwrap } from '../../lib/shell.ts';
+import { runCmdSilentUnwrap } from '@ls-stack/node-utils/runShellCmd';
 import type {
   ReviewContext,
   IndividualReview,

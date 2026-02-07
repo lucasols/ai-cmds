@@ -6,12 +6,12 @@ import type {
   ScopeContext,
 } from '../../lib/config.ts';
 import { getUnviewedPRFiles } from '../../lib/github.ts';
-import { runCmd } from '../../lib/shell.ts';
+import { runCmd } from '@ls-stack/node-utils/runShellCmd';
 
 async function findPRForCurrentBranch(): Promise<string | undefined> {
-  const result = await runCmd(['gh', 'pr', 'view', '--json', 'number'], {
+  const result = await runCmd(null, ['gh', 'pr', 'view', '--json', 'number'], {
     silent: true,
-    noColor: true,
+    noCiColorForce: true,
   });
 
   if (result.error) {
@@ -19,7 +19,7 @@ async function findPRForCurrentBranch(): Promise<string | undefined> {
   }
 
   try {
-    const parsed = JSON.parse(result.value.stdout) as { number: number };
+    const parsed = JSON.parse(result.stdout) as { number: number };
     return String(parsed.number);
   } catch {
     return undefined;
