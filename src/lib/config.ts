@@ -2,6 +2,7 @@ import type { JSONValue, LanguageModel } from 'ai';
 import { config as dotenvConfig } from 'dotenv';
 import { existsSync } from 'fs';
 import { join } from 'path';
+import { getGlobalEnvPath } from './global-env.ts';
 
 /**
  * Configuration for a custom AI model used in code review.
@@ -313,8 +314,12 @@ export async function loadConfig(cwd: string = process.cwd()): Promise<Config> {
   const configPath = join(cwd, 'ai-cmds.config.ts');
   const defaultEnvPath = join(cwd, '.env');
 
-  // Load default .env file first so config module can access env vars
-  loadEnvFile(defaultEnvPath);
+  // Load default .env file first so config module can access env vars.
+  // Fall back to global env when no local .env exists.
+  const localEnvLoaded = loadEnvFile(defaultEnvPath);
+  if (!localEnvLoaded) {
+    loadEnvFile(getGlobalEnvPath());
+  }
 
   if (!existsSync(configPath)) {
     cachedConfig = {};

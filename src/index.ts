@@ -22,3 +22,9 @@ export { commitCommand } from './commands/commit/commit.ts';
 export { createPRCommand } from './commands/create-pr/create-pr.ts';
 export { reviewCodeChangesCommand } from './commands/review-code-changes/review-code-changes.ts';
 export { reviewPRCommand } from './commands/review-pr/review-pr.ts';
+export { setGlobalEnvsCommand } from './commands/set-global-envs/set-global-envs.ts';
+export {
+  getGlobalEnvPath,
+  globalEnvExists,
+  createGlobalEnvFile,
+} from './lib/global-env.ts';

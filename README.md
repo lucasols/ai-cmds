@@ -7,7 +7,7 @@ AI-powered CLI tool that uses OpenAI and Google Gemini models to review code cha
 - Multiple AI models: GPT-5, GPT-5-mini, GPT-4o-mini, Gemini 2.5 Pro, Gemini 2.0 Flash
 - Configurable review setups from light to heavy
 - Custom setups with full control over reviewer and validator models
-- Five commands: `commit` for AI commit messages, `review-code-changes` for local development, `advanced-review-changes` for guided/customized local review focus, `review-pr` for CI, `create-pr` for PR creation
+- Six commands: `commit` for AI commit messages, `review-code-changes` for local development, `advanced-review-changes` for guided/customized local review focus, `review-pr` for CI, `create-pr` for PR creation, `set-global-envs` for global API key setup
 - Parallel reviews with a single structured validation pass for higher accuracy
 - Optional provider-aware concurrency limits for reviewer fan-out
 - AI-generated commit messages with interactive editing
@@ -182,6 +182,19 @@ ai-cmds create-pr --title "Fix login validation"
 - Supports `<!-- AI_DESCRIPTION -->` marker in templates for AI content placement
 - Opens GitHub compare URL with pre-filled title and body
 
+### `set-global-envs` - Global API Key Setup
+
+Create a global `.env` file at `~/.config/ai-cmds/.env` for API keys shared across all projects.
+
+```bash
+ai-cmds set-global-envs
+```
+
+**Behavior:**
+- Creates `~/.config/ai-cmds/.env` with commented-out placeholders for `OPENAI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, and `AI_CLI_LOGS_DIR`
+- If the file already exists, reports its location without overwriting
+- The global `.env` is loaded as a fallback when no local `.env` file exists in the project root
+
 ## Review Setups
 
 | Setup | Reviewers | Description |
@@ -271,7 +284,7 @@ export default defineConfig({
 });
 ```
 
-By default, `.env` is loaded automatically before the config file is imported, allowing you to reference environment variables in your config.
+By default, `.env` is loaded automatically before the config file is imported, allowing you to reference environment variables in your config. When no local `.env` file exists, the CLI falls back to the global env file at `~/.config/ai-cmds/.env` (see [`set-global-envs`](#set-global-envs---global-api-key-setup)).
 
 ### Configuration Options
 

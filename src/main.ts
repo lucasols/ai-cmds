@@ -5,6 +5,7 @@ import { commitCommand } from './commands/commit/commit.ts';
 import { createPRCommand } from './commands/create-pr/create-pr.ts';
 import { reviewCodeChangesCommand } from './commands/review-code-changes/review-code-changes.ts';
 import { reviewPRCommand } from './commands/review-pr/review-pr.ts';
+import { setGlobalEnvsCommand } from './commands/set-global-envs/set-global-envs.ts';
 
 await createCLI(
   { name: '✨ ai-cmds', baseCmd: 'ai-cmds' },
@@ -14,5 +15,6 @@ await createCLI(
     'review-pr': reviewPRCommand,
     'create-pr': createPRCommand,
     'advanced-review-changes': advancedReviewChangesCommand,
+    'set-global-envs': setGlobalEnvsCommand,
   },
 );
