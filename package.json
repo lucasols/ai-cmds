@@ -22,14 +22,14 @@
   "type": "module",
   "repository": "github:lucaslos/ai-cmds",
   "author": "Lucas Santos",
-  "main": "./dist/main.js",
+  "main": "./dist/main.mjs",
   "bin": {
-    "ai-cmds": "./dist/main.js"
+    "ai-cmds": "./dist/main.mjs"
   },
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "import": "./dist/index.mjs",
+      "types": "./dist/index.d.mts"
     }
   },
   "engines": {
@@ -43,7 +43,7 @@
     "eslint": "^9.33.0",
     "fetch-mock": "^12.5.3",
     "prettier": "^3.6.2",
-    "tsdown": "^0.14.1",
+    "tsdown": "^0.20.3",
     "typescript": "^5.9.2",
     "vite": "^7.1.2",
     "vitest": "^3.2.4"
