@@ -89,9 +89,16 @@ export type ReviewCodeChangesConfig = {
   /**
    * Path to a markdown file containing custom review instructions/guidelines.
    * These instructions are included in the prompt sent to reviewers.
+   * YAML frontmatter (if present) is automatically stripped before use.
+   *
+   * When not set, the tool auto-detects instructions from convention paths:
+   * - `.agents/CODE_REVIEW.md`
+   * - `.agents/skills/code-review/SKILL.md`
+   *
+   * Set to `false` to disable file-based instructions and use built-in defaults.
    * @example './REVIEW_GUIDELINES.md'
    */
-  reviewInstructionsPath?: string;
+  reviewInstructionsPath?: string | false;
 
   /**
    * Whether to include the repository AGENTS.md content in reviewer prompts.

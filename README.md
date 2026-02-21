@@ -303,7 +303,7 @@ By default, the global `~/.config/ai-cmds/.env` is loaded first (see [`set-globa
 |--------|-------------|
 | `baseBranch` | Base branch for diff comparison. Can be a string or function `(currentBranch) => string`. If not set, prompts for selection |
 | `codeReviewDiffExcludePatterns` | Glob patterns for files to exclude from review |
-| `reviewInstructionsPath` | Path to custom review instructions markdown file |
+| `reviewInstructionsPath` | Path to custom review instructions markdown file. Auto-detects `.agents/CODE_REVIEW.md` or `.agents/skills/code-review/SKILL.md` when not set. YAML frontmatter is stripped automatically. Set to `false` to disable |
 | `includeAgentsFileInReviewPrompt` | Include `<git-root>/AGENTS.md` content in reviewer prompts (default: `true`) |
 | `reviewOutputPath` | Default output file path for `review-code-changes` (can be overridden by `--output`) |
 | `setup` | Array of custom named setups (see below) |

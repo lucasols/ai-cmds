@@ -13,7 +13,7 @@ import type {
 const CODE_FENCE = '```';
 
 export type ReviewInstructionOptions = {
-  reviewInstructionsPath?: string;
+  reviewInstructionsPath?: string | false;
   includeDefaultReviewInstructions?: boolean;
   customReviewInstruction?: string;
 };
@@ -67,16 +67,59 @@ const defaultReviewInstructions = dedent`
   - Framework-specific patterns the team may intentionally avoid
 `;
 
-function getReviewInstructions(customPath?: string): string {
-  if (customPath && existsSync(customPath)) {
-    try {
-      return readFileSync(customPath, 'utf-8');
-    } catch {
-      console.warn(
-        `Warning: Could not read review instructions from ${customPath}, using defaults`,
-      );
+export function stripYamlFrontmatter(content: string): string {
+  if (!content.startsWith('---')) {
+    return content;
+  }
+  const closingIndex = content.indexOf('\n---', 3);
+  if (closingIndex === -1) {
+    return content;
+  }
+  return content.slice(closingIndex + 4).trimStart();
+}
+
+const REVIEW_INSTRUCTIONS_FALLBACK_PATHS = [
+  '.agents/CODE_REVIEW.md',
+  '.agents/skills/code-review/SKILL.md',
+] as const;
+
+function tryReadFile(filePath: string): string | undefined {
+  if (!existsSync(filePath)) {
+    return undefined;
+  }
+  try {
+    return readFileSync(filePath, 'utf-8');
+  } catch {
+    console.warn(`Warning: Could not read file ${filePath}`);
+    return undefined;
+  }
+}
+
+function getReviewInstructions(customPath?: string | false): string {
+  if (customPath === false) {
+    return defaultReviewInstructions;
+  }
+
+  if (customPath) {
+    const content = tryReadFile(customPath);
+    if (content !== undefined) {
+      return stripYamlFrontmatter(content);
+    }
+    console.warn(
+      `Warning: Could not read review instructions from ${customPath}, using defaults`,
+    );
+    return defaultReviewInstructions;
+  }
+
+  const gitRoot = git.getGitRoot();
+  for (const fallbackPath of REVIEW_INSTRUCTIONS_FALLBACK_PATHS) {
+    const fullPath = join(gitRoot, fallbackPath);
+    const content = tryReadFile(fullPath);
+    if (content !== undefined) {
+      return stripYamlFrontmatter(content);
     }
   }
+
   return defaultReviewInstructions;
 }
 
