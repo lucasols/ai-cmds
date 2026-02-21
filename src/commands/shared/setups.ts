@@ -22,7 +22,7 @@ export const gpt5ModelHigh: Model = {
   config: {
     topP: false,
     providerOptions: {
-      reasoningEffort: 'high',
+      reasoningEffort: 'xhigh',
       reasoningSummary: 'auto',
     } satisfies OpenAIResponsesProviderOptions,
   },
@@ -147,11 +147,11 @@ export const DEFAULT_SETUPS = {
     reviewers: [
       {
         model: gpt5ModelHigh.model,
-        providerOptions: { reasoningEffort: 'high' },
+        providerOptions: { reasoningEffort: 'xhigh' },
       },
       {
         model: gpt5ModelHigh.model,
-        providerOptions: { reasoningEffort: 'high' },
+        providerOptions: { reasoningEffort: 'xhigh' },
       },
     ],
   },
@@ -161,19 +161,19 @@ export const DEFAULT_SETUPS = {
     reviewers: [
       {
         model: gpt5ModelHigh.model,
-        providerOptions: { reasoningEffort: 'high' },
+        providerOptions: { reasoningEffort: 'xhigh' },
       },
       {
         model: gpt5ModelHigh.model,
-        providerOptions: { reasoningEffort: 'high' },
+        providerOptions: { reasoningEffort: 'xhigh' },
       },
       {
         model: gpt5ModelHigh.model,
-        providerOptions: { reasoningEffort: 'high' },
+        providerOptions: { reasoningEffort: 'xhigh' },
       },
       {
         model: gpt5ModelHigh.model,
-        providerOptions: { reasoningEffort: 'high' },
+        providerOptions: { reasoningEffort: 'xhigh' },
       },
     ],
   },
