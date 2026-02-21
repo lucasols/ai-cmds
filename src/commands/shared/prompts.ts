@@ -116,6 +116,7 @@ function getReviewInstructions(customPath?: string | false): string {
     const fullPath = join(gitRoot, fallbackPath);
     const content = tryReadFile(fullPath);
     if (content !== undefined) {
+      console.log(`Using review instructions from ${fallbackPath}`);
       return stripYamlFrontmatter(content);
     }
   }
@@ -169,6 +170,7 @@ function getAgentsInstructions(includeAgentsFileInReviewPrompt: boolean): {
   }
 
   try {
+    console.log(`Using AGENTS.md from ${agentsPath}`);
     return {
       path: agentsPath,
       content: readFileSync(agentsPath, 'utf-8'),

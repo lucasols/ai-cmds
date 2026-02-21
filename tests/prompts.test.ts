@@ -122,6 +122,7 @@ describe('review instructions fallback paths', () => {
   });
 
   it('uses first fallback path when it exists', () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.mocked(existsSync).mockImplementation(
       (p) => String(p) === '/mock/git/root/.agents/CODE_REVIEW.md',
     );
@@ -133,9 +134,14 @@ describe('review instructions fallback paths', () => {
 
     expect(prompt.system).toContain('# Custom from fallback');
     expect(prompt.system).not.toContain('Trust the tooling');
+    expect(logSpy).toHaveBeenCalledWith(
+      'Using review instructions from .agents/CODE_REVIEW.md',
+    );
+    logSpy.mockRestore();
   });
 
   it('uses second fallback path when first is missing', () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.mocked(existsSync).mockImplementation(
       (p) =>
         String(p) ===
@@ -149,6 +155,10 @@ describe('review instructions fallback paths', () => {
 
     expect(prompt.system).toContain('# Skill instructions');
     expect(prompt.system).not.toContain('Trust the tooling');
+    expect(logSpy).toHaveBeenCalledWith(
+      'Using review instructions from .agents/skills/code-review/SKILL.md',
+    );
+    logSpy.mockRestore();
   });
 
   it('falls back to defaults when no fallback paths exist', () => {
