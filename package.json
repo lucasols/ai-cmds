@@ -1,6 +1,6 @@
 {
   "name": "ai-cmds",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "license": "MIT",
   "scripts": {
     "dev": "node src/main.ts",
