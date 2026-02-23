@@ -48,7 +48,7 @@ import {
 } from '../shared/setups.ts';
 import type { IndividualReview, LocalReviewContext } from '../shared/types.ts';
 
-const MAX_DIFF_TOKENS = 60_000;
+const DEFAULT_MAX_DIFF_TOKENS = 60_000;
 
 type ResolvedComparisonBaseRef = {
   baseBranch: string;
@@ -464,22 +464,38 @@ export async function runLocalReviewChangesWorkflow(
     return;
   }
 
+  const maxDiffTokens = config.maxDiffTokens ?? DEFAULT_MAX_DIFF_TOKENS;
   const diffTokens = estimateTokenCount(prDiff);
+  let ignoreAgentsMd = false;
 
-  if (diffTokens > MAX_DIFF_TOKENS) {
+  if (diffTokens > maxDiffTokens) {
     console.log(
-      `⚠️  Diff has ${formatNum(diffTokens)} tokens (max suggested: ${formatNum(MAX_DIFF_TOKENS)})`,
+      `⚠️  Diff has ${formatNum(diffTokens)} tokens (max suggested: ${formatNum(maxDiffTokens)})`,
     );
 
-    const shouldContinue = await cliInput.confirm(
-      'Continue anyway? Large diffs may result in less accurate reviews',
+    const action = await cliInput.select(
+      'Large diffs may result in less accurate reviews. How do you want to proceed?',
       {
-        initial: false,
+        options: [
+          { value: 'continue', label: 'Continue anyway' },
+          {
+            value: 'continue-no-agents',
+            label: 'Continue without AGENTS.md (saves tokens)',
+          },
+          { value: 'cancel', label: 'Cancel' },
+        ],
       },
     );
 
-    if (!shouldContinue) {
+    if (action === 'cancel') {
       process.exit(1);
+    }
+
+    if (action === 'continue-no-agents') {
+      ignoreAgentsMd = true;
+      console.log(
+        '📄 AGENTS.md will be excluded from reviewer prompts to save tokens',
+      );
     }
   }
 
@@ -530,7 +546,7 @@ export async function runLocalReviewChangesWorkflow(
             {
               reviewInstructionsPath: config.reviewInstructionsPath,
               includeAgentsFileInReviewPrompt:
-                config.includeAgentsFileInReviewPrompt,
+                ignoreAgentsMd ? false : config.includeAgentsFileInReviewPrompt,
               includeDefaultReviewInstructions,
               customReviewInstruction,
             },
