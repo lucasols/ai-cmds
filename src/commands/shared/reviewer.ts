@@ -161,10 +161,10 @@ export async function runSingleReview(
     reviewerId,
     content: result.value.text,
     usage: {
-      promptTokens: result.value.usage.inputTokens ?? 0,
-      completionTokens: result.value.usage.outputTokens ?? 0,
-      totalTokens: result.value.usage.totalTokens ?? 0,
-      reasoningTokens: result.value.usage.reasoningTokens,
+      promptTokens: result.value.totalUsage.inputTokens ?? 0,
+      completionTokens: result.value.totalUsage.outputTokens ?? 0,
+      totalTokens: result.value.totalUsage.totalTokens ?? 0,
+      reasoningTokens: result.value.totalUsage.reasoningTokens,
       model: modelId,
     },
     debug: createDebugTrace({
@@ -242,10 +242,10 @@ export async function reviewValidator(
     issues: validatedIssues,
     summary: validatedOutput.summary,
     usage: {
-      promptTokens: result.value.usage.inputTokens ?? 0,
-      completionTokens: result.value.usage.outputTokens ?? 0,
-      totalTokens: result.value.usage.totalTokens ?? 0,
-      reasoningTokens: result.value.usage.reasoningTokens ?? 0,
+      promptTokens: result.value.totalUsage.inputTokens ?? 0,
+      completionTokens: result.value.totalUsage.outputTokens ?? 0,
+      totalTokens: result.value.totalUsage.totalTokens ?? 0,
+      reasoningTokens: result.value.totalUsage.reasoningTokens ?? 0,
       model: getModelId(model),
     },
     debug: createDebugTrace({
@@ -356,10 +356,10 @@ export async function runPreviousReviewCheck(
     reviewerId: 'previous-review-checker',
     content: previousCheckContent,
     usage: {
-      promptTokens: result.value.usage.inputTokens ?? 0,
-      completionTokens: result.value.usage.outputTokens ?? 0,
-      totalTokens: result.value.usage.totalTokens ?? 0,
-      reasoningTokens: result.value.usage.reasoningTokens,
+      promptTokens: result.value.totalUsage.inputTokens ?? 0,
+      completionTokens: result.value.totalUsage.outputTokens ?? 0,
+      totalTokens: result.value.totalUsage.totalTokens ?? 0,
+      reasoningTokens: result.value.totalUsage.reasoningTokens,
       model: modelId,
     },
     debug: createDebugTrace({
