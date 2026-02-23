@@ -47,12 +47,12 @@ export const reviewSetupConfigs: Record<ReviewSetup, ReviewSetupConfig> = {
     validator: gpt5ModelHigh,
   },
   medium: {
-    reviewers: [gpt5ModelHigh, gpt5ModelHigh],
-    validator: gpt5ModelHigh,
+    reviewers: [gpt5Model, gpt5Model],
+    validator: gpt5Model,
   },
   heavy: {
-    reviewers: [gpt5ModelHigh, gpt5ModelHigh, gpt5ModelHigh, gpt5ModelHigh],
-    validator: gpt5ModelHigh,
+    reviewers: [gpt5ModelHigh, gpt5ModelHigh],
+    validator: gpt5Model,
   },
 };
 
