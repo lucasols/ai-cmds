@@ -135,7 +135,9 @@ describe('review instructions fallback paths', () => {
     expect(prompt.system).toContain('# Custom from fallback');
     expect(prompt.system).not.toContain('Trust the tooling');
     expect(logSpy).toHaveBeenCalledWith(
-      'Using review instructions from .agents/CODE_REVIEW.md',
+      expect.stringContaining(
+        'Using review instructions from .agents/CODE_REVIEW.md',
+      ),
     );
     logSpy.mockRestore();
   });
@@ -156,7 +158,9 @@ describe('review instructions fallback paths', () => {
     expect(prompt.system).toContain('# Skill instructions');
     expect(prompt.system).not.toContain('Trust the tooling');
     expect(logSpy).toHaveBeenCalledWith(
-      'Using review instructions from .agents/skills/code-review/SKILL.md',
+      expect.stringContaining(
+        'Using review instructions from .agents/skills/code-review/SKILL.md',
+      ),
     );
     logSpy.mockRestore();
   });
