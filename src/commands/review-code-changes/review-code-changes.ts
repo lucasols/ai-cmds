@@ -1,8 +1,9 @@
 import { cliInput, createCmd } from '@ls-stack/cli';
 import { createAsyncQueueWithMeta } from '@ls-stack/utils/asyncQueue';
 import { dedent } from '@ls-stack/utils/dedent';
+import { existsSync } from 'fs';
 import { mkdir, writeFile } from 'fs/promises';
-import { dirname } from 'path';
+import { dirname, join } from 'path';
 import { estimateTokenCount } from 'tokenx';
 import { globalAbortSignal } from '../../lib/abort.ts';
 import {
@@ -473,18 +474,27 @@ export async function runLocalReviewChangesWorkflow(
       `⚠️  Diff has ${formatNum(diffTokens)} tokens (max suggested: ${formatNum(maxDiffTokens)})`,
     );
 
-    const action = await cliInput.select(
-      'Large diffs may result in less accurate reviews. How do you want to proceed?',
-      {
-        options: [
-          { value: 'continue', label: 'Continue anyway' },
+    const includeAgents = config.includeAgentsFileInReviewPrompt !== false;
+    const agentsFileExists = existsSync(join(git.getGitRoot(), 'AGENTS.md'));
+    const showAgentsOption = includeAgents && agentsFileExists;
+
+    type SelectOption = { value: string; label: string };
+    const selectOptions: SelectOption[] = [
+      { value: 'continue', label: 'Continue anyway' },
+      ...(showAgentsOption ?
+        [
           {
             value: 'continue-no-agents',
             label: 'Continue without AGENTS.md (saves tokens)',
           },
-          { value: 'cancel', label: 'Cancel' },
-        ],
-      },
+        ]
+      : []),
+      { value: 'cancel', label: 'Cancel' },
+    ];
+
+    const action = await cliInput.select(
+      'Large diffs may result in less accurate reviews. How do you want to proceed?',
+      { options: selectOptions },
     );
 
     if (action === 'cancel') {
