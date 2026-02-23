@@ -104,7 +104,7 @@ const ripgrepInputSchema = z.object({
     .number()
     .max(500)
     .optional()
-    .describe('Maximum number of results to return (default: 50)'),
+    .describe('Maximum number of results to return (default: 50, max: 500)'),
 });
 
 type RipgrepInput = z.infer<typeof ripgrepInputSchema>;
