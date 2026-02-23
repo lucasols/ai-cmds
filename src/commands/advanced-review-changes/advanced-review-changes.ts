@@ -106,19 +106,11 @@ export const advancedReviewChangesCommand = createCmd({
       output,
       commandId: 'advanced-review-changes',
       resolveInstructionSelection: async () => {
-        let shouldIncludeDefaultReviewInstructions = parseBooleanOption(
-          includeDefaultReviewInstructions,
-          '--include-default-review-instructions',
-        );
-
-        if (shouldIncludeDefaultReviewInstructions === undefined) {
-          shouldIncludeDefaultReviewInstructions = await cliInput.confirm(
-            'Include default/configured review instructions?',
-            {
-              initial: true,
-            },
-          );
-        }
+        const shouldIncludeDefaultReviewInstructions =
+          parseBooleanOption(
+            includeDefaultReviewInstructions,
+            '--include-default-review-instructions',
+          ) ?? true;
 
         let resolvedCustomReviewInstruction = customReviewInstruction?.trim();
         if (!resolvedCustomReviewInstruction) {
