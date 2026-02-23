@@ -1,7 +1,7 @@
+import { runCmd } from '@ls-stack/node-utils/runShellCmd';
 import { tool } from 'ai';
 import { readFileSync } from 'fs';
 import { z } from 'zod';
-import { runCmd } from '@ls-stack/node-utils/runShellCmd';
 
 const readFileInputSchema = z.object({
   filename: z.string().describe('Path to the file to read'),
@@ -102,6 +102,7 @@ const ripgrepInputSchema = z.object({
     .describe('Whether to ignore case in search (default: false)'),
   maxResults: z
     .number()
+    .max(500)
     .optional()
     .describe('Maximum number of results to return (default: 50)'),
 });
@@ -159,7 +160,7 @@ export function createRipgrepTool(reviewerId?: number | string) {
         const lines = result.stdout
           .split('\n')
           .filter((line: string) => line.trim());
-        const limitedLines = maxResults ? lines.slice(0, maxResults) : lines;
+        const limitedLines = lines.slice(0, maxResults);
         const output = limitedLines.join('\n');
 
         const truncatedMessage =
