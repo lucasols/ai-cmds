@@ -61,13 +61,6 @@ ${diff}
   return prompt;
 }
 
-function getProviderId(model: LanguageModel): string {
-  if (typeof model === 'string') {
-    return 'unknown';
-  }
-  return model.provider;
-}
-
 type ResolvedModel = {
   model: LanguageModel;
   label: string;
@@ -82,10 +75,7 @@ async function resolveModel(
     return {
       model: customModel.model,
       label: customModel.label ?? 'custom model',
-      providerOptions:
-        customModel.providerOptions ?
-          { [getProviderId(customModel.model)]: customModel.providerOptions }
-        : undefined,
+      providerOptions: customModel.providerOptions,
     };
   }
 

@@ -12,8 +12,8 @@ export type CustomModelConfig = {
   label?: string;
   /** Vercel AI SDK LanguageModel instance (e.g., openai('gpt-5'), google('gemini-2.5-pro')) */
   model: LanguageModel;
-  /** Provider-specific options passed to the model (e.g., { reasoningEffort: 'high' } for OpenAI) */
-  providerOptions?: Record<string, JSONValue>;
+  /** Full AI SDK providerOptions object (e.g., { openai: { reasoningEffort: 'high' } }) */
+  providerOptions?: Record<string, Record<string, JSONValue>>;
 };
 
 /**

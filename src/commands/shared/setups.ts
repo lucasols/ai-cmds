@@ -6,14 +6,25 @@ import type {
 } from '../../lib/config.ts';
 import type { Model, ReviewSetup } from './types.ts';
 
+const OPENAI_MEDIUM_PROVIDER_OPTIONS = {
+  openai: {
+    reasoningEffort: 'medium',
+    reasoningSummary: 'auto',
+  } satisfies OpenAIResponsesProviderOptions,
+};
+
+const OPENAI_XHIGH_PROVIDER_OPTIONS = {
+  openai: {
+    reasoningEffort: 'xhigh',
+    reasoningSummary: 'auto',
+  } satisfies OpenAIResponsesProviderOptions,
+};
+
 export const gpt5Model: Model = {
   model: openai('gpt-5.2'),
   config: {
     topP: false,
-    providerOptions: {
-      reasoningEffort: 'medium',
-      reasoningSummary: 'auto',
-    } satisfies OpenAIResponsesProviderOptions,
+    providerOptions: OPENAI_MEDIUM_PROVIDER_OPTIONS,
   },
 };
 
@@ -21,10 +32,7 @@ export const gpt5ModelHigh: Model = {
   model: openai('gpt-5.2'),
   config: {
     topP: false,
-    providerOptions: {
-      reasoningEffort: 'xhigh',
-      reasoningSummary: 'auto',
-    } satisfies OpenAIResponsesProviderOptions,
+    providerOptions: OPENAI_XHIGH_PROVIDER_OPTIONS,
   },
 };
 
@@ -147,11 +155,11 @@ export const DEFAULT_SETUPS = {
     reviewers: [
       {
         model: gpt5ModelHigh.model,
-        providerOptions: { reasoningEffort: 'xhigh' },
+        providerOptions: OPENAI_XHIGH_PROVIDER_OPTIONS,
       },
       {
         model: gpt5ModelHigh.model,
-        providerOptions: { reasoningEffort: 'xhigh' },
+        providerOptions: OPENAI_XHIGH_PROVIDER_OPTIONS,
       },
     ],
   },
@@ -161,19 +169,19 @@ export const DEFAULT_SETUPS = {
     reviewers: [
       {
         model: gpt5ModelHigh.model,
-        providerOptions: { reasoningEffort: 'xhigh' },
+        providerOptions: OPENAI_XHIGH_PROVIDER_OPTIONS,
       },
       {
         model: gpt5ModelHigh.model,
-        providerOptions: { reasoningEffort: 'xhigh' },
+        providerOptions: OPENAI_XHIGH_PROVIDER_OPTIONS,
       },
       {
         model: gpt5ModelHigh.model,
-        providerOptions: { reasoningEffort: 'xhigh' },
+        providerOptions: OPENAI_XHIGH_PROVIDER_OPTIONS,
       },
       {
         model: gpt5ModelHigh.model,
-        providerOptions: { reasoningEffort: 'xhigh' },
+        providerOptions: OPENAI_XHIGH_PROVIDER_OPTIONS,
       },
     ],
   },

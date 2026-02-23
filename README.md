@@ -370,7 +370,7 @@ export default defineConfig({
         id: 'myCustomSetup',
         label: 'myCustomSetup',
         reviewers: [
-          { label: 'GPT-5', model: openai('gpt-5.2'), providerOptions: { reasoningEffort: 'high' } },
+          { label: 'GPT-5', model: openai('gpt-5.2'), providerOptions: { openai: { reasoningEffort: 'high' } } },
           { model: google('gemini-2.5-pro') },
         ],
         validator: { model: openai('gpt-5.2') },
@@ -384,7 +384,7 @@ export default defineConfig({
     ],
 
     // Default validator for custom setups that don't specify one
-    defaultValidator: { model: openai('gpt-5.2'), providerOptions: { reasoningEffort: 'high' } },
+    defaultValidator: { model: openai('gpt-5.2'), providerOptions: { openai: { reasoningEffort: 'high' } } },
   },
 });
 ```

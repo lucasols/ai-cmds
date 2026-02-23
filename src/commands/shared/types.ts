@@ -4,7 +4,7 @@ export type Model = {
   model: LanguageModel;
   label?: string;
   config?: {
-    providerOptions?: Record<string, JSONValue>;
+    providerOptions?: Record<string, Record<string, JSONValue>>;
     topP?: number | false;
     temperature?: number;
   };

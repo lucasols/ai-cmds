@@ -138,10 +138,7 @@ export async function runSingleReview(
         ripgrep: createRipgrepTool(reviewerId),
       },
       ...(config?.topP !== false && { topP: config?.topP ?? 0.9 }),
-      providerOptions:
-        config?.providerOptions ?
-          { [getProviderId(model)]: config.providerOptions }
-        : undefined,
+      providerOptions: config?.providerOptions,
     }),
   );
 
@@ -225,10 +222,7 @@ export async function reviewValidator(
       },
       experimental_output: Output.object({ schema: validatedReviewSchema }),
       ...(config?.topP !== false && { topP: config?.topP ?? 0.7 }),
-      providerOptions:
-        config?.providerOptions ?
-          { [getProviderId(model)]: config.providerOptions }
-        : undefined,
+      providerOptions: config?.providerOptions,
     }),
   );
 
@@ -328,10 +322,7 @@ export async function runPreviousReviewCheck(
         ripgrep: createRipgrepTool('previous-review-checker'),
       },
       ...(config?.topP !== false && { topP: config?.topP ?? 0.7 }),
-      providerOptions:
-        config?.providerOptions ?
-          { [getProviderId(model)]: config.providerOptions }
-        : undefined,
+      providerOptions: config?.providerOptions,
     }),
   );
 
