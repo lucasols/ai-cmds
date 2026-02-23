@@ -7,6 +7,7 @@ import {
 import { z } from 'zod';
 import { formatNum } from '../../lib/diff.ts';
 import type { CommitConfig, CustomModelConfig } from '../../lib/config.ts';
+import { getModelEffort } from '../shared/reviewer.ts';
 
 const commitMessageSchema = z.object({
   subject: z
@@ -106,7 +107,9 @@ export async function generateCommitMessage(
   const primary = await resolveModel(config.primaryModel, 'google');
 
   try {
-    console.log(`🤖 Generating commit message with ${primary.label}...`);
+    console.log(
+      `🤖 Generating commit message with ${primary.label} (effort: ${getModelEffort(primary.providerOptions)})...`,
+    );
 
     const primaryStart = performance.now();
     const result = await generateObject({
@@ -118,7 +121,12 @@ export async function generateCommitMessage(
     });
     const primaryDuration = performance.now() - primaryStart;
 
-    logTokenUsage(primary.label, result.usage, primaryDuration);
+    logTokenUsage(
+      primary.label,
+      primary.providerOptions,
+      result.usage,
+      primaryDuration,
+    );
 
     return formatCommitMessage(result.object);
   } catch {
@@ -128,7 +136,9 @@ export async function generateCommitMessage(
 
     const fallback = await resolveModel(config.fallbackModel, 'openai');
 
-    console.log(`🤖 Generating commit message with ${fallback.label}...`);
+    console.log(
+      `🤖 Generating commit message with ${fallback.label} (effort: ${getModelEffort(fallback.providerOptions)})...`,
+    );
 
     const fallbackStart = performance.now();
     const result = await generateObject({
@@ -140,7 +150,12 @@ export async function generateCommitMessage(
     });
     const fallbackDuration = performance.now() - fallbackStart;
 
-    logTokenUsage(fallback.label, result.usage, fallbackDuration);
+    logTokenUsage(
+      fallback.label,
+      fallback.providerOptions,
+      result.usage,
+      fallbackDuration,
+    );
 
     return formatCommitMessage(result.object);
   }
@@ -148,6 +163,7 @@ export async function generateCommitMessage(
 
 function logTokenUsage(
   label: string,
+  providerOptions: Record<string, Record<string, unknown>> | undefined,
   usage: GenerateObjectResult<unknown>['usage'],
   durationMs: number,
 ): void {
@@ -155,8 +171,9 @@ function logTokenUsage(
   const output = formatNum(usage.outputTokens ?? 0);
   const total = formatNum(usage.totalTokens ?? 0);
   const seconds = (durationMs / 1000).toFixed(1);
+  const effort = getModelEffort(providerOptions);
   console.log(
-    `📊 ${label} — ${seconds}s, tokens: ${input} in / ${output} out / ${total} total`,
+    `📊 ${label} (effort: ${effort}) — ${seconds}s, tokens: ${input} in / ${output} out / ${total} total`,
   );
 }
 

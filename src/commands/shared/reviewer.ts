@@ -41,6 +41,23 @@ function getProviderId(model: Model['model']): string {
   return model.provider;
 }
 
+export function getModelEffort(
+  providerOptions: Record<string, Record<string, unknown>> | undefined,
+): string {
+  if (!providerOptions) {
+    return 'default effort';
+  }
+
+  for (const providerOpts of Object.values(providerOptions)) {
+    const effort = providerOpts['reasoningEffort'];
+    if (typeof effort === 'string' || typeof effort === 'number') {
+      return String(effort);
+    }
+  }
+
+  return 'default effort';
+}
+
 const validatedReviewSchema = z.object({
   issues: z.array(
     z.object({
@@ -146,14 +163,14 @@ export async function runSingleReview(
 
   if (result.error) {
     console.error(
-      `❌ Review ${reviewerId} failed with model ${modelId}`,
+      `❌ Review ${reviewerId} failed with model ${modelId} (effort: ${getModelEffort(config?.providerOptions)})`,
       result.error,
     );
     throw result.error;
   }
 
   console.log(
-    `✅ Review ${reviewerId} completed successfully with model ${modelId}`,
+    `✅ Review ${reviewerId} completed successfully with model ${modelId} (effort: ${getModelEffort(config?.providerOptions)})`,
   );
   const endedAt = new Date();
 
@@ -228,7 +245,7 @@ export async function reviewValidator(
 
   if (result.error) {
     console.error(
-      `❌ Validator failed with model ${getModelId(model)}`,
+      `❌ Validator failed with model ${getModelId(model)} (effort: ${getModelEffort(config?.providerOptions)})`,
       result.error,
     );
     throw result.error;
@@ -329,7 +346,9 @@ export async function runPreviousReviewCheck(
   const modelId = getModelId(model);
 
   if (result.error) {
-    console.error(`❌ Previous review check failed with model ${modelId}`);
+    console.error(
+      `❌ Previous review check failed with model ${modelId} (effort: ${getModelEffort(config?.providerOptions)})`,
+    );
     return null;
   }
 
@@ -348,7 +367,7 @@ export async function runPreviousReviewCheck(
   }
 
   console.log(
-    `✅ Previous review check completed successfully with model ${modelId}`,
+    `✅ Previous review check completed successfully with model ${modelId} (effort: ${getModelEffort(config?.providerOptions)})`,
   );
   const endedAt = new Date();
 
