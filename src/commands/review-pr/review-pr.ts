@@ -3,6 +3,7 @@ import { createAsyncQueueWithMeta } from '@ls-stack/utils/asyncQueue';
 import { dedent } from '@ls-stack/utils/dedent';
 import { writeFile } from 'fs/promises';
 import { estimateTokenCount } from 'tokenx';
+import { globalAbortSignal } from '../../lib/abort.ts';
 import {
   getExcludePatterns,
   loadConfig,
@@ -320,7 +321,7 @@ export const reviewPRCommand = createCmd({
       const queue = createAsyncQueueWithMeta<
         IndividualReview | null,
         { reviewerId: IndividualReview['reviewerId']; providerId: string }
-      >({ concurrency: providerConcurrency });
+      >({ concurrency: providerConcurrency, signal: globalAbortSignal });
 
       for (const reviewer of providerReviewers) {
         if (reviewer.reviewerId === 'previous-review-checker') {

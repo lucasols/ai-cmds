@@ -1,6 +1,7 @@
 import { generateText, Output, stepCountIs } from 'ai';
 import { resultify } from 't-result';
 import { z } from 'zod';
+import { globalAbortSignal } from '../../lib/abort.ts';
 import {
   createListDirectoryTool,
   createReadFileTool,
@@ -149,6 +150,7 @@ export async function runSingleReview(
       maxOutputTokens: 60_000,
       stopWhen: stepCountIs(80),
       maxRetries: 3,
+      abortSignal: globalAbortSignal,
       tools: {
         readFile: createReadFileTool(reviewerId),
         listDirectory: createListDirectoryTool(reviewerId),
@@ -232,6 +234,7 @@ export async function reviewValidator(
       maxOutputTokens: 80_000,
       stopWhen: stepCountIs(80),
       maxRetries: 3,
+      abortSignal: globalAbortSignal,
       tools: {
         readFile: createReadFileTool(),
         listDirectory: createListDirectoryTool(),
@@ -333,6 +336,7 @@ export async function runPreviousReviewCheck(
       maxOutputTokens: 40_000,
       stopWhen: stepCountIs(50),
       maxRetries: 3,
+      abortSignal: globalAbortSignal,
       tools: {
         readFile: createReadFileTool('previous-review-checker'),
         listDirectory: createListDirectoryTool('previous-review-checker'),

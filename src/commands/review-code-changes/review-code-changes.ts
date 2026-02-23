@@ -4,6 +4,7 @@ import { dedent } from '@ls-stack/utils/dedent';
 import { mkdir, writeFile } from 'fs/promises';
 import { dirname } from 'path';
 import { estimateTokenCount } from 'tokenx';
+import { globalAbortSignal } from '../../lib/abort.ts';
 import {
   getExcludePatterns,
   loadConfig,
@@ -514,7 +515,7 @@ export async function runLocalReviewChangesWorkflow(
     const queue = createAsyncQueueWithMeta<
       IndividualReview,
       { reviewerId: number; providerId: string }
-    >({ concurrency: providerConcurrency });
+    >({ concurrency: providerConcurrency, signal: globalAbortSignal });
 
     for (const reviewer of providerReviewers) {
       void queue.resultifyAdd(
