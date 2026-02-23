@@ -1,30 +1,30 @@
 import { generateText, Output, stepCountIs } from 'ai';
-import { z } from 'zod';
 import { resultify } from 't-result';
+import { z } from 'zod';
 import {
-  createReadFileTool,
   createListDirectoryTool,
+  createReadFileTool,
   createRipgrepTool,
 } from '../../lib/ai-tools.ts';
+import { github } from '../../lib/github.ts';
+import { EXTRA_DETAILS_MARKER, PR_REVIEW_MARKER } from './output.ts';
 import {
+  createPreviousReviewCheckPrompt,
   createReviewPrompt,
   createValidationPrompt,
-  createPreviousReviewCheckPrompt,
   type ReviewInstructionOptions,
   type ReviewPromptOptions,
 } from './prompts.ts';
-import { github } from '../../lib/github.ts';
-import { EXTRA_DETAILS_MARKER, PR_REVIEW_MARKER } from './output.ts';
 import type {
-  Model,
-  ReviewContext,
-  PRReviewContext,
-  PRData,
-  LLMDebugTrace,
-  IndividualReview,
-  ValidatedReview,
   GeneralPRComment,
+  IndividualReview,
+  LLMDebugTrace,
+  Model,
+  PRData,
+  PRReviewContext,
+  ReviewContext,
   ReviewIssue,
+  ValidatedReview,
 } from './types.ts';
 
 function getModelId(model: Model['model']): string {
@@ -55,7 +55,7 @@ export function getModelEffort(
     }
   }
 
-  return 'default effort';
+  return 'default';
 }
 
 const validatedReviewSchema = z.object({
