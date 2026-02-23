@@ -28,7 +28,7 @@ const OPENAI_LOW_PROVIDER_OPTIONS = {
 };
 
 export const gpt5Model: Model = {
-  model: openai('gpt-5.2'),
+  model: openai('gpt-5.2-codex'),
   config: {
     topP: false,
     providerOptions: OPENAI_MEDIUM_PROVIDER_OPTIONS,
@@ -36,7 +36,7 @@ export const gpt5Model: Model = {
 };
 
 export const gpt5ModelHigh: Model = {
-  model: openai('gpt-5.2'),
+  model: openai('gpt-5.2-codex'),
   config: {
     topP: false,
     providerOptions: OPENAI_XHIGH_PROVIDER_OPTIONS,
@@ -44,7 +44,7 @@ export const gpt5ModelHigh: Model = {
 };
 
 const gpt5ModelLow: Model = {
-  model: openai('gpt-5.2'),
+  model: openai('gpt-5.2-codex'),
   config: {
     topP: false,
     providerOptions: OPENAI_LOW_PROVIDER_OPTIONS,
