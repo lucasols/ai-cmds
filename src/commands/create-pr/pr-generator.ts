@@ -1,4 +1,5 @@
 import { generateObject, type LanguageModel } from 'ai';
+import { globalAbortSignal } from '../../lib/abort.ts';
 import { estimateTokenCount, sliceByTokens } from 'tokenx';
 import { z } from 'zod';
 import type { CreatePRConfig, GeneratedPRContent } from './types.ts';
@@ -171,6 +172,7 @@ export async function generatePRContent(params: {
     schema: prContentSchema,
     system: systemPrompt,
     prompt: userPrompt,
+    abortSignal: globalAbortSignal,
   });
 
   return result.object;

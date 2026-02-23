@@ -4,6 +4,7 @@ import {
   type JSONValue,
   type LanguageModel,
 } from 'ai';
+import { globalAbortSignal } from '../../lib/abort.ts';
 import { z } from 'zod';
 import { formatNum } from '../../lib/diff.ts';
 import type { CommitConfig, CustomModelConfig } from '../../lib/config.ts';
@@ -118,6 +119,7 @@ export async function generateCommitMessage(
       system: systemPrompt,
       prompt: userPrompt,
       providerOptions: primary.providerOptions,
+      abortSignal: globalAbortSignal,
     });
     const primaryDuration = performance.now() - primaryStart;
 
@@ -147,6 +149,7 @@ export async function generateCommitMessage(
       system: systemPrompt,
       prompt: userPrompt,
       providerOptions: fallback.providerOptions,
+      abortSignal: globalAbortSignal,
     });
     const fallbackDuration = performance.now() - fallbackStart;
 
