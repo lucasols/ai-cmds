@@ -1,6 +1,8 @@
 import { dedent } from '@ls-stack/utils/dedent';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
+import { estimateTokenCount } from 'tokenx';
+import { formatNum } from '../../lib/diff.ts';
 import { git } from '../../lib/git.ts';
 import type {
   GeneralPRComment,
@@ -9,6 +11,20 @@ import type {
   PRReviewContext,
   ReviewContext,
 } from './types.ts';
+
+const loggedMessages = new Set<string>();
+
+function logOnce(message: string): void {
+  if (loggedMessages.has(message)) return;
+  loggedMessages.add(message);
+  console.log(message);
+}
+
+function warnOnce(message: string): void {
+  if (loggedMessages.has(message)) return;
+  loggedMessages.add(message);
+  console.warn(message);
+}
 
 const CODE_FENCE = '```';
 
@@ -90,7 +106,7 @@ function tryReadFile(filePath: string): string | undefined {
   try {
     return readFileSync(filePath, 'utf-8');
   } catch {
-    console.warn(`Warning: Could not read file ${filePath}`);
+    warnOnce(`Warning: Could not read file ${filePath}`);
     return undefined;
   }
 }
@@ -103,9 +119,13 @@ function getReviewInstructions(customPath?: string | false): string {
   if (customPath) {
     const content = tryReadFile(customPath);
     if (content !== undefined) {
-      return stripYamlFrontmatter(content);
+      const stripped = stripYamlFrontmatter(content);
+      logOnce(
+        `📄 Using review instructions from ${customPath} (${formatNum(estimateTokenCount(stripped))} tokens)`,
+      );
+      return stripped;
     }
-    console.warn(
+    warnOnce(
       `Warning: Could not read review instructions from ${customPath}, using defaults`,
     );
     return defaultReviewInstructions;
@@ -116,8 +136,11 @@ function getReviewInstructions(customPath?: string | false): string {
     const fullPath = join(gitRoot, fallbackPath);
     const content = tryReadFile(fullPath);
     if (content !== undefined) {
-      console.log(`Using review instructions from ${fallbackPath}`);
-      return stripYamlFrontmatter(content);
+      const stripped = stripYamlFrontmatter(content);
+      logOnce(
+        `📄 Using review instructions from ${fallbackPath} (${formatNum(estimateTokenCount(stripped))} tokens)`,
+      );
+      return stripped;
     }
   }
 
@@ -170,13 +193,16 @@ function getAgentsInstructions(includeAgentsFileInReviewPrompt: boolean): {
   }
 
   try {
-    console.log(`Using AGENTS.md from ${agentsPath}`);
+    const content = readFileSync(agentsPath, 'utf-8');
+    logOnce(
+      `📄 Using AGENTS.md from ${agentsPath} (${formatNum(estimateTokenCount(content))} tokens)`,
+    );
     return {
       path: agentsPath,
-      content: readFileSync(agentsPath, 'utf-8'),
+      content,
     };
   } catch {
-    console.warn(
+    warnOnce(
       `Warning: Could not read AGENTS.md from ${agentsPath}, skipping AGENTS instructions`,
     );
     return null;
