@@ -20,6 +20,13 @@ const OPENAI_XHIGH_PROVIDER_OPTIONS = {
   } satisfies OpenAIResponsesProviderOptions,
 };
 
+const OPENAI_LOW_PROVIDER_OPTIONS = {
+  openai: {
+    reasoningEffort: 'low',
+    reasoningSummary: 'auto',
+  } satisfies OpenAIResponsesProviderOptions,
+};
+
 export const gpt5Model: Model = {
   model: openai('gpt-5.2'),
   config: {
@@ -36,6 +43,14 @@ export const gpt5ModelHigh: Model = {
   },
 };
 
+const gpt5ModelLow: Model = {
+  model: openai('gpt-5.2'),
+  config: {
+    topP: false,
+    providerOptions: OPENAI_LOW_PROVIDER_OPTIONS,
+  },
+};
+
 export type ReviewSetupConfig = {
   reviewers: Model[];
   validator: Model;
@@ -44,15 +59,15 @@ export type ReviewSetupConfig = {
 export const reviewSetupConfigs: Record<ReviewSetup, ReviewSetupConfig> = {
   light: {
     reviewers: [gpt5Model],
-    validator: gpt5ModelHigh,
+    validator: gpt5ModelLow,
   },
   medium: {
     reviewers: [gpt5Model, gpt5Model],
-    validator: gpt5Model,
+    validator: gpt5ModelLow,
   },
   heavy: {
     reviewers: [gpt5ModelHigh, gpt5ModelHigh],
-    validator: gpt5Model,
+    validator: gpt5ModelLow,
   },
 };
 
