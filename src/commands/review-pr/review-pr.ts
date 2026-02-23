@@ -13,7 +13,11 @@ import {
 import { formatNum } from '../../lib/diff.ts';
 import { github } from '../../lib/github.ts';
 import { showErrorAndExit } from '../../lib/shell.ts';
-import { applyExcludePatterns, getDiffForFiles } from '../shared/diff-utils.ts';
+import {
+  applyExcludePatterns,
+  compactDiff,
+  getDiffForFiles,
+} from '../shared/diff-utils.ts';
 import {
   calculateReviewsUsage,
   calculateTotalUsage,
@@ -37,7 +41,7 @@ import {
 } from '../shared/setups.ts';
 import type { IndividualReview, PRReviewContext } from '../shared/types.ts';
 
-const MAX_DIFF_TOKENS = 60_000;
+const DEFAULT_MAX_DIFF_TOKENS = 60_000;
 
 type ProviderReviewTask = {
   reviewerId: IndividualReview['reviewerId'];
@@ -196,7 +200,7 @@ export const reviewPRCommand = createCmd({
     console.log(`📁 ${prFiles.length} files changed`);
 
     const excludePatterns = getExcludePatterns(config);
-    const changedFiles = applyExcludePatterns(prFiles, excludePatterns);
+    let changedFiles = applyExcludePatterns(prFiles, excludePatterns);
 
     if (changedFiles.length === 0) {
       showErrorAndExit(
@@ -215,11 +219,38 @@ export const reviewPRCommand = createCmd({
       `📋 Using ${setupLabel} setup with ${setupConfig.reviewers.length} reviewer(s)\n`,
     );
 
-    const prDiff = await getDiffForFiles(changedFiles, {
+    const maxDiffTokens = config.maxDiffTokens ?? DEFAULT_MAX_DIFF_TOKENS;
+
+    let prDiff = await getDiffForFiles(changedFiles, {
       baseBranch: prData.baseRefName,
       excludeFiles: excludePatterns,
       useStaged: false,
     });
+
+    let ignoreAgentsMd = false;
+
+    if (config.diffCompactor && estimateTokenCount(prDiff) > maxDiffTokens) {
+      const compacted = await compactDiff(
+        changedFiles,
+        prDiff,
+        {
+          baseBranch: prData.baseRefName,
+          excludeFiles: excludePatterns,
+          useStaged: false,
+        },
+        maxDiffTokens,
+        config.diffCompactor,
+      );
+      changedFiles = compacted.files;
+      prDiff = compacted.diff;
+      ignoreAgentsMd = compacted.ignoreAgentsMd;
+
+      if (ignoreAgentsMd) {
+        console.log(
+          '📄 AGENTS.md will be excluded from reviewer prompts (ignoreAgentsMd enabled by compactor step)',
+        );
+      }
+    }
 
     const mode: 'gh-actions' | 'test' =
       isGitHubActions && !test ? 'gh-actions' : 'test';
@@ -259,9 +290,9 @@ export const reviewPRCommand = createCmd({
 
     const diffTokens = estimateTokenCount(prDiff);
 
-    if (diffTokens > MAX_DIFF_TOKENS) {
+    if (diffTokens > maxDiffTokens) {
       showErrorAndExit(
-        `❌ PR has ${formatNum(diffTokens)} tokens in the diff (max allowed: ${formatNum(MAX_DIFF_TOKENS)})`,
+        `❌ PR has ${formatNum(diffTokens)} tokens in the diff (max allowed: ${formatNum(maxDiffTokens)})`,
       );
     }
 
@@ -358,7 +389,9 @@ export const reviewPRCommand = createCmd({
               {
                 reviewInstructionsPath: config.reviewInstructionsPath,
                 includeAgentsFileInReviewPrompt:
-                  config.includeAgentsFileInReviewPrompt,
+                  ignoreAgentsMd ? false : (
+                    config.includeAgentsFileInReviewPrompt
+                  ),
               },
             ),
           {

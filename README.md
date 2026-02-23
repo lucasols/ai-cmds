@@ -325,6 +325,8 @@ By default, the global `~/.config/ai-cmds/.env` is loaded first (see [`set-globa
 | `setup`                           | Array of custom named setups (see below)                                                                                                                                                                                |
 | `scope`                           | Array of custom named scopes (see below)                                                                                                                                                                                |
 | `defaultValidator`                | Default validator model for custom setups                                                                                                                                                                               |
+| `maxDiffTokens`                   | Maximum tokens allowed in the diff. `review-pr` exits when exceeded (default: `60000`)                                                                                                                                  |
+| `diffCompactor`                   | Array of steps to progressively filter files when diff exceeds `maxDiffTokens` (see below)                                                                                                                              |
 | `concurrencyPerProvider`          | Reviewer concurrency limit. Use a number for all providers or `{ [providerId]: number }` for per-provider limits (keys come from `model.provider`, e.g. `openai.responses`; unspecified providers default to unlimited) |
 | `logsDir`                         | Directory for review run artifacts (can also use `AI_CLI_LOGS_DIR` env var)                                                                                                                                             |
 
@@ -495,6 +497,33 @@ Use custom scopes via CLI:
 ```bash
 ai-cmds review-code-changes --scope src-only
 ```
+
+### Diff Compactor
+
+When reviewing large PRs, the diff may exceed the `maxDiffTokens` limit (default: 60,000). Instead of hard-exiting, configure `diffCompactor` to progressively filter files until the diff fits:
+
+```typescript
+export default defineConfig({
+  codeReview: {
+    maxDiffTokens: 60_000,
+    diffCompactor: [
+      {
+        name: 'Remove test files',
+        filterFiles: (files) => files.filter((f) => !f.includes('.test.')),
+      },
+      {
+        name: 'Source only',
+        filterFiles: (files) => files.filter((f) => f.startsWith('src/')),
+        ignoreAgentsMd: true,
+      },
+    ],
+  },
+});
+```
+
+Steps are applied in order. After each step the diff is re-fetched and checked against the limit. Processing stops as soon as the diff is small enough. If all steps are exhausted and the diff is still too large, `review-pr` exits with an error as before.
+
+Each step supports an optional `ignoreAgentsMd` flag. When a step with `ignoreAgentsMd: true` is applied, the repository's `AGENTS.md` file is excluded from reviewer prompts to further reduce token usage.
 
 ## GitHub Actions Integration
 

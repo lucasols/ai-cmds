@@ -67,13 +67,6 @@ export type ScopeConfig = {
   /** Function that receives available file lists and returns the files to review */
   getFiles: (ctx: ScopeContext) => string[] | Promise<string[]>;
   showFileCount?: boolean;
-  diffCompactor?: {
-    maxTokens: number;
-    steps: {
-      name: string;
-      filterFiles: (files: string[]) => string[] | Promise<string[]>;
-    }[];
-  };
 };
 
 export type ReviewCodeChangesConfig = {
@@ -149,6 +142,24 @@ export type ReviewCodeChangesConfig = {
    * Config value takes precedence over env var.
    */
   logsDir?: string;
+
+  /**
+   * Maximum tokens allowed in the diff. Used by review-pr to reject oversized diffs.
+   * @default 60_000
+   */
+  maxDiffTokens?: number;
+
+  /**
+   * Steps to progressively filter files when diff exceeds maxDiffTokens.
+   * Applied in order until diff is under the limit or all steps are exhausted.
+   */
+  diffCompactor?: {
+    name: string;
+    filterFiles: (files: string[]) => string[] | Promise<string[]>;
+    /** When true, also disables AGENTS.md inclusion in reviewer prompts to save tokens.
+     * Takes effect only when this step is actually applied. */
+    ignoreAgentsMd?: boolean;
+  }[];
 
   /**
    * Concurrency limit for running independent reviewer models.
