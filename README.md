@@ -47,9 +47,11 @@ ai-cmds commit --dry-run
 ```
 
 **Arguments:**
+
 - `--dry-run` - Preview the generated message without committing
 
 **Behavior:**
+
 - If no files are staged, automatically stages all changes before generating
 - Lockfiles are excluded from the diff sent to AI by default
 - After generation, choose to: **Commit**, **Edit**, **Regenerate**, or **Cancel**
@@ -77,6 +79,7 @@ ai-cmds review-code-changes --scope all --output reviews/local-review.md
 ```
 
 **Arguments:**
+
 - `--scope` - Review scope: `all`, `staged`, `globs`, `unViewed`, or custom scope id
 - `--setup` - Review setup: `light`, `medium`, `heavy`, or custom setup id
 - `--base-branch` - Base branch for diff comparison (if not specified, prompts for selection)
@@ -100,6 +103,7 @@ ai-cmds advanced-review-changes \
 ```
 
 **Arguments:**
+
 - `--scope` - Review scope: `all`, `staged`, `globs`, `unViewed`, or custom scope id
 - `--setup` - Review setup: `light`, `medium`, `heavy`, or custom setup id
 - `--base-branch` - Base branch for diff comparison (if not specified, prompts for selection)
@@ -108,6 +112,7 @@ ai-cmds advanced-review-changes \
 - `--include-default-review-instructions` - Whether to include configured/default instructions (`true` or `false`)
 
 **Interactive behavior:**
+
 - If `--include-default-review-instructions` is not provided, the CLI shows a confirm dialog.
 - If `--custom-review-instruction` is not provided, the CLI asks whether you want to add one and prompts for it if confirmed.
 
@@ -127,12 +132,14 @@ ai-cmds review-pr --pr 123 --setup heavy
 ```
 
 **Arguments:**
+
 - `--pr` - PR number to review (**required**)
 - `--setup` - Review setup: `light`, `medium`, `heavy`, or custom setup id
 - `--test` - Test mode: skip posting review to PR, just save to file
 - `--skip-previous-check` - Skip checking if previous review issues are still present
 
 **Behavior:**
+
 - In GitHub Actions (`GITHUB_ACTIONS` env set): Posts review as PR comment
 - With `--test` flag or locally: Saves review to `pr-review-test.md`
 - If the filtered diff has no reviewable code (for example import/export-only changes), the command skips AI calls and emits a no-issues review
@@ -170,12 +177,14 @@ ai-cmds create-pr --title "Fix login validation"
 ```
 
 **Arguments:**
+
 - `--base` - Base branch for the PR (if not specified, uses config or prompts)
 - `--no-ai` - Skip AI generation and use template only
 - `--dry-run` - Preview PR content without opening browser
 - `--title` - Override the AI-generated PR title
 
 **Behavior:**
+
 - Checks if a PR already exists for the current branch
 - Automatically pushes the branch if not already pushed
 - Uses PR template from `.github/pull_request_template.md` (configurable)
@@ -191,26 +200,27 @@ ai-cmds set-global-envs
 ```
 
 **Behavior:**
+
 - Creates `~/.config/ai-cmds/.env` with commented-out placeholders for `OPENAI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, and `AI_CLI_LOGS_DIR`
 - If the file already exists, reports its location without overwriting
 - The global `.env` is always loaded first, then the local `.env` overrides any overlapping variables
 
 ## Review Setups
 
-| Setup | Reviewers | Description |
-|-------|-----------|-------------|
-| `light` | 1× GPT-5 | Balanced |
-| `medium` | 2× GPT-5 (high reasoning) | More thorough |
-| `heavy` | 4× GPT-5 (high reasoning) | Most comprehensive |
+| Setup    | Reviewers                   | Description        |
+| -------- | --------------------------- | ------------------ |
+| `light`  | 1× GPT-5                    | Balanced           |
+| `medium` | 2× GPT-5 (medium reasoning) | More thorough      |
+| `heavy`  | 2× GPT-5 (xhigh reasoning)  | Most comprehensive |
 
 ## Review Scopes
 
-| Scope | Description |
-|-------|-------------|
-| `all` | All changes compared to base branch |
-| `staged` | Only staged changes |
-| `globs` | Interactive glob pattern selection (use `!pattern` to exclude) |
-| `unViewed` | Unviewed files in PR (requires open PR for current branch) |
+| Scope      | Description                                                    |
+| ---------- | -------------------------------------------------------------- |
+| `all`      | All changes compared to base branch                            |
+| `staged`   | Only staged changes                                            |
+| `globs`    | Interactive glob pattern selection (use `!pattern` to exclude) |
+| `unViewed` | Unviewed files in PR (requires open PR for current branch)     |
 
 ### Using the `globs` Scope
 
@@ -222,6 +232,7 @@ ai-cmds review-code-changes --scope globs
 ```
 
 Pattern syntax:
+
 - `src/**/*.ts` - Include all TypeScript files in src
 - `!**/*.test.ts` - Exclude test files
 - `components` - Simple folder names are expanded to `**/components/**`
@@ -246,7 +257,11 @@ import { defineConfig } from 'ai-cmds';
 export default defineConfig({
   codeReview: {
     baseBranch: 'main',
-    codeReviewDiffExcludePatterns: ['pnpm-lock.yaml', '**/*.svg', '**/*.test.ts'],
+    codeReviewDiffExcludePatterns: [
+      'pnpm-lock.yaml',
+      '**/*.svg',
+      '**/*.test.ts',
+    ],
     reviewInstructionsPath: '.github/PR_REVIEW_AGENT.md',
     includeAgentsFileInReviewPrompt: true,
     concurrencyPerProvider: {
@@ -257,7 +272,8 @@ export default defineConfig({
   createPR: {
     baseBranch: 'main',
     diffExcludePatterns: ['pnpm-lock.yaml'],
-    descriptionInstructions: 'Always mention Jira ticket if present in branch name',
+    descriptionInstructions:
+      'Always mention Jira ticket if present in branch name',
   },
   commit: {
     maxDiffTokens: 10000,
@@ -290,48 +306,48 @@ By default, the global `~/.config/ai-cmds/.env` is loaded first (see [`set-globa
 
 #### Root Options
 
-| Option | Description |
-|--------|-------------|
+| Option       | Description                                                                                                                                                     |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `loadDotEnv` | Controls `.env` file loading. `true` (default): load `.env`, `false`: skip, `string`: additional file path, `string[]`: multiple files (later override earlier) |
-| `codeReview` | Configuration for the review commands (see below) |
-| `createPR` | Configuration for the create-pr command (see below) |
-| `commit` | Configuration for the commit command (see below) |
+| `codeReview` | Configuration for the review commands (see below)                                                                                                               |
+| `createPR`   | Configuration for the create-pr command (see below)                                                                                                             |
+| `commit`     | Configuration for the commit command (see below)                                                                                                                |
 
 #### `codeReview` Options
 
-| Option | Description |
-|--------|-------------|
-| `baseBranch` | Base branch for diff comparison. Can be a string or function `(currentBranch) => string`. If not set, prompts for selection |
-| `codeReviewDiffExcludePatterns` | Glob patterns for files to exclude from review |
-| `reviewInstructionsPath` | Path to custom review instructions markdown file. Auto-detects `.agents/CODE_REVIEW.md` or `.agents/skills/code-review/SKILL.md` when not set. YAML frontmatter is stripped automatically. Set to `false` to disable |
-| `includeAgentsFileInReviewPrompt` | Include `<git-root>/AGENTS.md` content in reviewer prompts (default: `true`) |
-| `reviewOutputPath` | Default output file path for `review-code-changes` (can be overridden by `--output`) |
-| `setup` | Array of custom named setups (see below) |
-| `scope` | Array of custom named scopes (see below) |
-| `defaultValidator` | Default validator model for custom setups |
-| `concurrencyPerProvider` | Reviewer concurrency limit. Use a number for all providers or `{ [providerId]: number }` for per-provider limits (keys come from `model.provider`, e.g. `openai.responses`; unspecified providers default to unlimited) |
-| `logsDir` | Directory for review run artifacts (can also use `AI_CLI_LOGS_DIR` env var) |
+| Option                            | Description                                                                                                                                                                                                             |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `baseBranch`                      | Base branch for diff comparison. Can be a string or function `(currentBranch) => string`. If not set, prompts for selection                                                                                             |
+| `codeReviewDiffExcludePatterns`   | Glob patterns for files to exclude from review                                                                                                                                                                          |
+| `reviewInstructionsPath`          | Path to custom review instructions markdown file. Auto-detects `.agents/CODE_REVIEW.md` or `.agents/skills/code-review/SKILL.md` when not set. YAML frontmatter is stripped automatically. Set to `false` to disable    |
+| `includeAgentsFileInReviewPrompt` | Include `<git-root>/AGENTS.md` content in reviewer prompts (default: `true`)                                                                                                                                            |
+| `reviewOutputPath`                | Default output file path for `review-code-changes` (can be overridden by `--output`)                                                                                                                                    |
+| `setup`                           | Array of custom named setups (see below)                                                                                                                                                                                |
+| `scope`                           | Array of custom named scopes (see below)                                                                                                                                                                                |
+| `defaultValidator`                | Default validator model for custom setups                                                                                                                                                                               |
+| `concurrencyPerProvider`          | Reviewer concurrency limit. Use a number for all providers or `{ [providerId]: number }` for per-provider limits (keys come from `model.provider`, e.g. `openai.responses`; unspecified providers default to unlimited) |
+| `logsDir`                         | Directory for review run artifacts (can also use `AI_CLI_LOGS_DIR` env var)                                                                                                                                             |
 
 #### `createPR` Options
 
-| Option | Description |
-|--------|-------------|
-| `templatePath` | Path to PR template file (default: `.github/pull_request_template.md`) |
-| `baseBranch` | Base branch for the PR. Can be a string or function `(currentBranch) => string` |
-| `preferredProvider` | Preferred AI provider: `'openai'` or `'google'` (auto-detects if not set) |
-| `descriptionInstructions` | Custom instructions for AI description generation |
-| `diffExcludePatterns` | Glob patterns for files to exclude from diff |
-| `maxDiffTokens` | Maximum tokens from diff to include in AI prompt (default: 50000) |
+| Option                    | Description                                                                     |
+| ------------------------- | ------------------------------------------------------------------------------- |
+| `templatePath`            | Path to PR template file (default: `.github/pull_request_template.md`)          |
+| `baseBranch`              | Base branch for the PR. Can be a string or function `(currentBranch) => string` |
+| `preferredProvider`       | Preferred AI provider: `'openai'` or `'google'` (auto-detects if not set)       |
+| `descriptionInstructions` | Custom instructions for AI description generation                               |
+| `diffExcludePatterns`     | Glob patterns for files to exclude from diff                                    |
+| `maxDiffTokens`           | Maximum tokens from diff to include in AI prompt (default: 50000)               |
 
 #### `commit` Options
 
-| Option | Description |
-|--------|-------------|
-| `primaryModel` | Custom AI model for commit message generation (default: Gemini 2.5 Flash) |
-| `fallbackModel` | Fallback AI model if primary fails (default: GPT-5-mini) |
-| `maxDiffTokens` | Maximum tokens from diff to include in AI prompt (default: 10000) |
+| Option            | Description                                                                           |
+| ----------------- | ------------------------------------------------------------------------------------- |
+| `primaryModel`    | Custom AI model for commit message generation (default: Gemini 2.5 Flash)             |
+| `fallbackModel`   | Fallback AI model if primary fails (default: GPT-5-mini)                              |
+| `maxDiffTokens`   | Maximum tokens from diff to include in AI prompt (default: 10000)                     |
 | `excludePatterns` | Additional glob patterns to exclude from diff (merged with default lockfile patterns) |
-| `instructions` | Custom instructions for AI commit message generation |
+| `instructions`    | Custom instructions for AI commit message generation                                  |
 
 When `codeReview.logsDir` (or `AI_CLI_LOGS_DIR`) is set, each review run stores artifacts under:
 
@@ -370,7 +386,11 @@ export default defineConfig({
         id: 'myCustomSetup',
         label: 'myCustomSetup',
         reviewers: [
-          { label: 'GPT-5', model: openai('gpt-5.2'), providerOptions: { openai: { reasoningEffort: 'high' } } },
+          {
+            label: 'GPT-5',
+            model: openai('gpt-5.2'),
+            providerOptions: { openai: { reasoningEffort: 'high' } },
+          },
           { model: google('gemini-2.5-pro') },
         ],
         validator: { model: openai('gpt-5.2') },
@@ -384,7 +404,10 @@ export default defineConfig({
     ],
 
     // Default validator for custom setups that don't specify one
-    defaultValidator: { model: openai('gpt-5.2'), providerOptions: { openai: { reasoningEffort: 'high' } } },
+    defaultValidator: {
+      model: openai('gpt-5.2'),
+      providerOptions: { openai: { reasoningEffort: 'high' } },
+    },
   },
 });
 ```
@@ -439,10 +462,12 @@ export default defineConfig({
 ```
 
 The `getFiles` function receives a context object with:
+
 - `stagedFiles`: Files currently staged for commit
 - `allFiles`: All files changed compared to base branch
 
 The optional `diffSource` field controls which git diff source the scope uses:
+
 - `'branch'` (default): compare against selected base branch
 - `'staged'`: use staged changes
 
@@ -455,7 +480,11 @@ export default defineConfig({
   codeReview: {
     scope: [
       ...BUILT_IN_SCOPE_OPTIONS, // includes all, staged, globs, unViewed
-      { id: 'src-only', label: 'Source files only', getFiles: (ctx) => ctx.allFiles.filter((f) => f.startsWith('src/')) },
+      {
+        id: 'src-only',
+        label: 'Source files only',
+        getFiles: (ctx) => ctx.allFiles.filter((f) => f.startsWith('src/')),
+      },
     ],
   },
 });
