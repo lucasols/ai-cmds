@@ -1,13 +1,13 @@
-import { readFileSync, existsSync } from 'fs';
-import { join } from 'path';
 import { dedent } from '@ls-stack/utils/dedent';
+import { existsSync, readFileSync } from 'fs';
+import { join } from 'path';
 import { git } from '../../lib/git.ts';
 import type {
-  ReviewContext,
-  PRReviewContext,
-  PRData,
-  IndividualReview,
   GeneralPRComment,
+  IndividualReview,
+  PRData,
+  PRReviewContext,
+  ReviewContext,
 } from './types.ts';
 
 const CODE_FENCE = '```';
@@ -364,31 +364,6 @@ IMPORTANT: Files with import-only changes have been stripped from the diff to re
 
 Write your final review directly in your response following the specified format.
 </task>
-
-<read_file_instructions>
-CRITICAL: You MUST use the readFile tool to read full file contents when:
-1. The diff doesn't show enough context to understand the code
-2. You need to verify imports, type definitions, or function implementations
-3. You want to understand the overall structure or purpose of a file
-4. You need to check if a function/variable/type is defined elsewhere
-
-DO NOT make assumptions about:
-- What functions or methods do based only on their names
-- The implementation details of code not shown in the diff
-- Whether types, variables, or functions exist if not visible in the diff
-- The structure or content of files you haven't explicitly read
-
-ALWAYS use the readFile tool when you need more context. It's better to read the file than to guess.
-
-Use it combined with listDirectory and ripgrep to get the full context of the code.
-
-Example scenarios where you MUST use readFile:
-- When reviewing a function call but the function definition isn't in the diff
-- When seeing a type usage but the type definition isn't visible
-- When evaluating if an import is correct but can't see the exported items
-- When assessing if a refactoring is complete across the file
-- When you are not sure about how the changes will behave with the existing code
-</read_file_instructions>
 `;
 
   const prompt = `
