@@ -67,6 +67,13 @@ export type ScopeConfig = {
   /** Function that receives available file lists and returns the files to review */
   getFiles: (ctx: ScopeContext) => string[] | Promise<string[]>;
   showFileCount?: boolean;
+  diffCompactor?: {
+    maxTokens: number;
+    steps: {
+      name: string;
+      filterFiles: (files: string[]) => string[] | Promise<string[]>;
+    }[];
+  };
 };
 
 export type ReviewCodeChangesConfig = {
