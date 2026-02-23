@@ -345,7 +345,7 @@ export function createReviewPrompt(
 ): { system: string; prompt: string } {
   const reviewInstructions = createEffectiveReviewInstructions(options);
   const agentsInstructions = getAgentsInstructions(
-    options.includeAgentsFileInReviewPrompt ?? true,
+    options.includeAgentsFileInReviewPrompt ?? false,
   );
 
   const systemCacheableContent = `
