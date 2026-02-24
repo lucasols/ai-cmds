@@ -346,6 +346,33 @@ const existingPRSchema = z.object({
 
 export type ExistingPR = z.infer<typeof existingPRSchema>;
 
+const createPRResultSchema = z.object({
+  url: z.string(),
+  number: z.number(),
+});
+
+export async function createPR(params: {
+  baseBranch: string;
+  title: string;
+  body: string;
+}): Promise<{ url: string; number: number }> {
+  const result = await ghJsonCmdUnwrap([
+    'gh',
+    'pr',
+    'create',
+    '--base',
+    params.baseBranch,
+    '--title',
+    params.title,
+    '--body',
+    params.body,
+    '--json',
+    'url,number',
+  ]);
+
+  return createPRResultSchema.parse(JSON.parse(result));
+}
+
 export async function checkExistingPR(
   branch: string,
 ): Promise<ExistingPR | null> {
@@ -417,6 +444,7 @@ export const github = {
   getUnviewedPRFiles,
   getLatestPRReviewComment,
   parsePreviousReviewIssues,
+  createPR,
   checkExistingPR,
   checkBranchPushed,
   pushBranch,

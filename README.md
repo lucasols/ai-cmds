@@ -185,11 +185,17 @@ ai-cmds create-pr --title "Fix login validation"
 
 **Behavior:**
 
-- Checks if a PR already exists for the current branch
+- Checks if a PR already exists for the current branch (blocks if open, warns if already merged)
 - Automatically pushes the branch if not already pushed
 - Uses PR template from `.github/pull_request_template.md` (configurable)
 - Supports `<!-- AI_DESCRIPTION -->` marker in templates for AI content placement
-- Opens GitHub compare URL with pre-filled title and body
+- After AI generation, shows a preview with interactive options:
+  - **Open in browser** — opens GitHub compare URL with pre-filled title and body
+  - **Publish PR** — creates the PR via `gh pr create` and opens it in the browser
+  - **Edit title** — edit the AI-generated title before publishing
+  - **Regenerate** — provide additional context and re-generate the description
+  - **Cancel** — exit without creating a PR
+- When using `--no-ai` or if AI generation fails, opens the browser directly
 
 ### `set-global-envs` - Global API Key Setup
 
