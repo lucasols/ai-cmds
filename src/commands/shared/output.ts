@@ -3,6 +3,7 @@ import { styleText } from 'util';
 import { git } from '../../lib/git.ts';
 import { github } from '../../lib/github.ts';
 import { runCmdSilentUnwrap } from '@ls-stack/node-utils/runShellCmd';
+import { getModelEffort } from './reviewer.ts';
 import type {
   ReviewContext,
   IndividualReview,
@@ -113,6 +114,7 @@ function getIssueStats(issues: ReviewIssue[]): {
 function formatTokenUsageSection(
   reviews: IndividualReview[],
   validatorUsage: TokenUsage,
+  validatorProviderOptions: Record<string, Record<string, unknown>> | undefined,
 ): string {
   let content = '';
 
@@ -131,6 +133,7 @@ function formatTokenUsageSection(
   for (const review of reviews) {
     content += `**Reviewer ${review.reviewerId}:**\n`;
     content += `- Model: ${review.usage.model}\n`;
+    content += `- Effort: ${getModelEffort(review.debug?.config?.providerOptions)}\n`;
     content += `- Input Tokens: ${formatNum(review.usage.promptTokens || 0)}\n`;
     content += `- Output Tokens: ${formatNum(review.usage.completionTokens || 0)}\n`;
     content += `- Total Tokens: ${formatNum(review.usage.totalTokens || 0)}\n`;
@@ -140,6 +143,7 @@ function formatTokenUsageSection(
 
   content += '**Validator:**\n';
   content += `- Model: ${validatorUsage.model}\n`;
+  content += `- Effort: ${getModelEffort(validatorProviderOptions)}\n`;
   content += `- Input Tokens: ${formatNum(validatorUsage.promptTokens)}\n`;
   content += `- Output Tokens: ${formatNum(validatorUsage.completionTokens)}\n`;
   content += `- Total Tokens: ${formatNum(validatorUsage.totalTokens)}\n`;
@@ -260,6 +264,7 @@ export async function formatValidatedReview(
   tokenUsage: {
     reviews: IndividualReview[];
     validatorUsage: TokenUsage;
+    validatorProviderOptions?: Record<string, Record<string, unknown>>;
   },
 ): Promise<string> {
   const { summary, issues } = validatedReview;
@@ -422,7 +427,7 @@ ${EXTRA_DETAILS_MARKER}
 <details>
 <summary>🤖 Token Usage Details</summary>
 
-${formatTokenUsageSection(tokenUsage.reviews, tokenUsage.validatorUsage)}
+${formatTokenUsageSection(tokenUsage.reviews, tokenUsage.validatorUsage, tokenUsage.validatorProviderOptions)}
 </details>
 `;
 

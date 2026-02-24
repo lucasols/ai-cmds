@@ -663,6 +663,7 @@ export async function runLocalReviewChangesWorkflow(
     {
       reviews: successfulReviews,
       validatorUsage: validatedReview.usage,
+      validatorProviderOptions: validatedReview.debug?.config?.providerOptions,
     },
   );
 

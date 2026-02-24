@@ -497,6 +497,7 @@ export const reviewPRCommand = createCmd({
       {
         reviews: successfulReviews,
         validatorUsage: validatedReview.usage,
+        validatorProviderOptions: validatedReview.debug?.config?.providerOptions,
       },
     );
 
