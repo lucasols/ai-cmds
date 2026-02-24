@@ -72,10 +72,13 @@ function normalizeGlobPattern(pattern: string): string {
 async function selectFilesWithGlobPatterns(
   allFiles: string[],
 ): Promise<string[]> {
+  let previousInput: string | undefined;
+
   for (;;) {
     const input = await cliInput.text(
       'Enter glob patterns (space-separated, use !pattern to exclude)',
       {
+        initial: previousInput,
         validate: (value) => {
           if (!value.trim()) {
             return 'Please enter at least one pattern';
@@ -84,6 +87,8 @@ async function selectFilesWithGlobPatterns(
         },
       },
     );
+
+    previousInput = input;
 
     const patterns = input.trim().split(/\s+/);
     const matchedFiles = filterFilesWithGlobPatterns(allFiles, patterns);

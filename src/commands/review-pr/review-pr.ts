@@ -7,8 +7,8 @@ import { globalAbortSignal } from '../../lib/abort.ts';
 import {
   getExcludePatterns,
   loadConfig,
-  type ReviewConcurrencyConfig,
   resolveLogsDir,
+  type ReviewConcurrencyConfig,
 } from '../../lib/config.ts';
 import { formatNum } from '../../lib/diff.ts';
 import { github } from '../../lib/github.ts';
@@ -27,12 +27,12 @@ import {
   logTokenUsageBreakdown,
   logValidatedIssueSummary,
 } from '../shared/output.ts';
+import { persistReviewRunLogs } from '../shared/review-logs.ts';
 import {
   reviewValidator,
   runPreviousReviewCheck,
   runSingleReview,
 } from '../shared/reviewer.ts';
-import { persistReviewRunLogs } from '../shared/review-logs.ts';
 import {
   getAvailableSetups,
   resolveSetup,
@@ -363,7 +363,7 @@ export const reviewPRCommand = createCmd({
                 prData,
                 changedFiles,
                 prDiff,
-                reviewer.model,
+                setupConfig.validator,
                 {
                   reviewInstructionsPath: config.reviewInstructionsPath,
                 },
