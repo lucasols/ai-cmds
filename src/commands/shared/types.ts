@@ -101,5 +101,4 @@ export type GeneralPRComment = {
   createdAt: string;
 };
 
-export type ReviewSetup = 'light' | 'medium' | 'heavy';
 export type ReviewScope = 'all' | 'staged';

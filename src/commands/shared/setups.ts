@@ -4,7 +4,7 @@ import type {
   ReviewCodeChangesConfig,
   SetupConfig,
 } from '../../lib/config.ts';
-import type { Model, ReviewSetup } from './types.ts';
+import type { Model } from './types.ts';
 
 const OPENAI_MEDIUM_PROVIDER_OPTIONS = {
   openai: {
@@ -20,9 +20,8 @@ const OPENAI_XHIGH_PROVIDER_OPTIONS = {
   } satisfies OpenAIResponsesProviderOptions,
 };
 
-const OPENAI_LOW_PROVIDER_OPTIONS = {
+const OPENAI_MINIMAL_PROVIDER_OPTIONS = {
   openai: {
-    reasoningEffort: 'low',
     reasoningSummary: 'auto',
   } satisfies OpenAIResponsesProviderOptions,
 };
@@ -43,11 +42,11 @@ export const gpt5ModelHigh: Model = {
   },
 };
 
-const gpt5ModelLow: Model = {
+const gpt5ModelMinimal: Model = {
   model: openai('gpt-5.2-codex'),
   config: {
     topP: false,
-    providerOptions: OPENAI_LOW_PROVIDER_OPTIONS,
+    providerOptions: OPENAI_MINIMAL_PROVIDER_OPTIONS,
   },
 };
 
@@ -55,25 +54,6 @@ export type ReviewSetupConfig = {
   reviewers: Model[];
   validator: Model;
 };
-
-export const reviewSetupConfigs: Record<ReviewSetup, ReviewSetupConfig> = {
-  light: {
-    reviewers: [gpt5Model],
-    validator: gpt5ModelLow,
-  },
-  medium: {
-    reviewers: [gpt5Model, gpt5Model],
-    validator: gpt5ModelLow,
-  },
-  heavy: {
-    reviewers: [gpt5ModelHigh, gpt5ModelHigh],
-    validator: gpt5ModelLow,
-  },
-};
-
-export function isGoogleSetup(setup: ReviewSetup): boolean {
-  return setup.endsWith('Google');
-}
 
 function toModel(cfg: CustomModelConfig): Model {
   return {
@@ -120,8 +100,9 @@ export function resolveSetup(
   }
 
   // Then check built-in presets
-  if (setupId in reviewSetupConfigs) {
-    return reviewSetupConfigs[setupId as ReviewSetup];
+  if (setupId in DEFAULT_SETUPS) {
+    const builtIn = DEFAULT_SETUPS[setupId as keyof typeof DEFAULT_SETUPS];
+    return convertCustomSetup(builtIn, config);
   }
 
   return undefined;
@@ -136,7 +117,7 @@ export function getAvailableSetups(config: ReviewCodeChangesConfig): string[] {
     return config.setup.map((s) => s.id);
   }
   // Otherwise show built-in presets
-  return Object.keys(reviewSetupConfigs);
+  return Object.keys(DEFAULT_SETUPS);
 }
 
 /**
@@ -158,47 +139,45 @@ export function getAvailableSetups(config: ReviewCodeChangesConfig): string[] {
  * });
  * ```
  */
+const xhighModel: CustomModelConfig = {
+  model: gpt5ModelHigh.model,
+  providerOptions: OPENAI_XHIGH_PROVIDER_OPTIONS,
+};
+
+const minimalModel: CustomModelConfig = {
+  model: gpt5ModelMinimal.model,
+  providerOptions: OPENAI_MINIMAL_PROVIDER_OPTIONS,
+};
+
+const mediumModel: CustomModelConfig = {
+  model: gpt5Model.model,
+  providerOptions: OPENAI_MEDIUM_PROVIDER_OPTIONS,
+};
+
 export const DEFAULT_SETUPS = {
   light: {
     id: 'light',
-    label: 'Light - 1 GPT-5 reviewer',
-    reviewers: [{ model: gpt5Model.model }],
+    label: 'Light - 1 GPT-5 minimal reviewer',
+    reviewers: [minimalModel],
+    validator: minimalModel,
   },
   medium: {
     id: 'medium',
-    label: 'Medium - 2 GPT-5 reviewers',
-    reviewers: [
-      {
-        model: gpt5ModelHigh.model,
-        providerOptions: OPENAI_XHIGH_PROVIDER_OPTIONS,
-      },
-      {
-        model: gpt5ModelHigh.model,
-        providerOptions: OPENAI_XHIGH_PROVIDER_OPTIONS,
-      },
-    ],
+    label: 'Medium - 1 GPT-5 medium reviewer',
+    reviewers: [mediumModel],
+    validator: minimalModel,
   },
   heavy: {
     id: 'heavy',
-    label: 'Heavy - 4 GPT-5 reviewers',
-    reviewers: [
-      {
-        model: gpt5ModelHigh.model,
-        providerOptions: OPENAI_XHIGH_PROVIDER_OPTIONS,
-      },
-      {
-        model: gpt5ModelHigh.model,
-        providerOptions: OPENAI_XHIGH_PROVIDER_OPTIONS,
-      },
-      {
-        model: gpt5ModelHigh.model,
-        providerOptions: OPENAI_XHIGH_PROVIDER_OPTIONS,
-      },
-      {
-        model: gpt5ModelHigh.model,
-        providerOptions: OPENAI_XHIGH_PROVIDER_OPTIONS,
-      },
-    ],
+    label: 'Heavy - 2 GPT-5 medium reviewers',
+    reviewers: Array.from({ length: 2 }, () => mediumModel),
+    validator: minimalModel,
+  },
+  xheavy: {
+    id: 'xheavy',
+    label: 'X-Heavy - 2 GPT-5 xhigh reviewers',
+    reviewers: Array.from({ length: 2 }, () => xhighModel),
+    validator: minimalModel,
   },
 } as const satisfies Record<string, SetupConfig>;
 

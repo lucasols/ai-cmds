@@ -36,7 +36,6 @@ import {
 import {
   getAvailableSetups,
   resolveSetup,
-  reviewSetupConfigs,
   type ReviewSetupConfig,
 } from '../shared/setups.ts';
 import type { IndividualReview, PRReviewContext } from '../shared/types.ts';
@@ -186,7 +185,11 @@ export const reviewPRCommand = createCmd({
 
     if (!setupConfig) {
       setupLabel = 'light';
-      setupConfig = reviewSetupConfigs.light;
+      setupConfig = resolveSetup(config, 'light');
+
+      if (!setupConfig) {
+        showErrorAndExit('Failed to resolve default light setup');
+      }
     }
 
     console.log(`\n🔄 Fetching PR #${pr} data...`);
