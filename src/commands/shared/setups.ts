@@ -175,7 +175,7 @@ export const DEFAULT_SETUPS = {
   },
   xheavy: {
     id: 'xheavy',
-    label: 'X-Heavy - 2 GPT-5 xhigh reviewers',
+    label: 'Extra-Heavy - 2 GPT-5 xhigh reviewers (Very expensive!)',
     reviewers: Array.from({ length: 2 }, () => xhighModel),
     validator: minimalModel,
   },
