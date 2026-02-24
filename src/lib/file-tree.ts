@@ -43,12 +43,21 @@ function collapseSingleChildDirs(node: TreeNode): TreeNode {
   for (const [name, child] of node.children) {
     const collapsedChild = collapseSingleChildDirs(child);
 
-    if (
-      !collapsedChild.isFile &&
-      collapsedChild.children.size === 1
-    ) {
-      const [childName, grandChild] = [...collapsedChild.children.entries()][0];
-      collapsed.children.set(`${name}/${childName}`, grandChild);
+    if (!collapsedChild.isFile && collapsedChild.children.size === 1) {
+      const firstEntry = collapsedChild.children.entries().next().value;
+
+      if (firstEntry) {
+        const [childName, grandChild] = firstEntry;
+
+        // Only collapse if the single child is a directory, not a file
+        if (!grandChild.isFile || grandChild.children.size > 0) {
+          collapsed.children.set(`${name}/${childName}`, grandChild);
+        } else {
+          collapsed.children.set(name, collapsedChild);
+        }
+      } else {
+        collapsed.children.set(name, collapsedChild);
+      }
     } else {
       collapsed.children.set(name, collapsedChild);
     }
@@ -62,7 +71,9 @@ function renderTree(node: TreeNode, prefix: string): string[] {
   const entries = [...node.children.entries()];
 
   for (let i = 0; i < entries.length; i++) {
-    const [name, child] = entries[i];
+    const entry = entries[i];
+    if (!entry) continue;
+    const [name, child] = entry;
     const isLast = i === entries.length - 1;
     const connector = isLast ? '└── ' : '├── ';
     const continuation = isLast ? '    ' : '│   ';
@@ -114,9 +125,7 @@ function formatCollapsedLabel(info: CollapsedInfo): string {
     parts.push(`${info.dirCount} ${info.dirCount === 1 ? 'dir' : 'dirs'}`);
   }
   if (info.fileCount > 0) {
-    parts.push(
-      `${info.fileCount} ${info.fileCount === 1 ? 'file' : 'files'}`,
-    );
+    parts.push(`${info.fileCount} ${info.fileCount === 1 ? 'file' : 'files'}`);
   }
   return `(${parts.join(', ')})`;
 }

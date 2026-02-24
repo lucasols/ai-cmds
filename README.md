@@ -237,6 +237,8 @@ Pattern syntax:
 - `!**/*.test.ts` - Exclude test files
 - `components` - Simple folder names are expanded to `**/components/**`
 
+Matched files are displayed as a directory tree for easy visualization. Deep directories are automatically collapsed when the tree exceeds 100 lines.
+
 ### Using the `unViewed` Scope
 
 The `unViewed` scope reviews only files you haven't marked as "viewed" in the GitHub PR interface:

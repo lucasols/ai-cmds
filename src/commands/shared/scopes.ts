@@ -5,6 +5,7 @@ import type {
   ScopeConfig,
   ScopeContext,
 } from '../../lib/config.ts';
+import { formatFileTree } from '../../lib/file-tree.ts';
 import { getUnviewedPRFiles } from '../../lib/github.ts';
 import { runCmd } from '@ls-stack/node-utils/runShellCmd';
 
@@ -99,11 +100,9 @@ async function selectFilesWithGlobPatterns(
     }
 
     console.log(`\n📁 Matched ${matchedFiles.length} files:`);
-    for (const file of matchedFiles.slice(0, 10)) {
-      console.log(`   ${file}`);
-    }
-    if (matchedFiles.length > 10) {
-      console.log(`   ... and ${matchedFiles.length - 10} more`);
+    const treeLines = formatFileTree(matchedFiles, 100);
+    for (const line of treeLines) {
+      console.log(`   ${line}`);
     }
     console.log('');
 
