@@ -52,7 +52,7 @@
     "@ai-sdk/google": "^2.0.46",
     "@ai-sdk/openai": "^2.0.86",
     "@clack/prompts": "^0.11.0",
-    "@ls-stack/cli": "^0.1.0",
+    "@ls-stack/cli": "^0.6.0",
     "@ls-stack/node-utils": "^0.2.0",
     "@ls-stack/utils": "^3.68.0",
     "ai": "^5.0.113",
