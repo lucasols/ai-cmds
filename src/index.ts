@@ -23,6 +23,7 @@ export { createPRCommand } from './commands/create-pr/create-pr.ts';
 export { reviewCodeChangesCommand } from './commands/review-code-changes/review-code-changes.ts';
 export { reviewPRCommand } from './commands/review-pr/review-pr.ts';
 export { setGlobalEnvsCommand } from './commands/set-global-envs/set-global-envs.ts';
+export { syncPRDescriptionCommand } from './commands/sync-pr-description/sync-pr-description.ts';
 export {
   getGlobalEnvPath,
   globalEnvExists,

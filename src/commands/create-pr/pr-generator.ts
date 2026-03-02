@@ -58,12 +58,20 @@ function buildUserPrompt(params: {
   changedFiles: string[];
   diff: string;
   customInstructions?: string;
+  currentTitle?: string;
 }): string {
-  const { branchName, changedFiles, diff, customInstructions } = params;
+  const { branchName, changedFiles, diff, customInstructions, currentTitle } =
+    params;
 
   let prompt = `Generate a PR title and description for the following changes.
 
-Branch name: ${branchName}
+Branch name: ${branchName}`;
+
+  if (currentTitle) {
+    prompt += `\n\nCurrent PR title (provides insight into the PR intent): ${currentTitle}`;
+  }
+
+  prompt += `
 
 Changed files:
 ${changedFiles.map((f) => `- ${f}`).join('\n')}
@@ -126,8 +134,9 @@ export async function generatePRContent(params: {
   changedFiles: string[];
   diff: string;
   config: CreatePRConfig;
+  currentTitle?: string;
 }): Promise<GeneratedPRContent> {
-  const { branchName, changedFiles, diff, config } = params;
+  const { branchName, changedFiles, diff, config, currentTitle } = params;
 
   const preferredProvider = config.preferredProvider;
   let provider: AIProvider | null = null;
@@ -165,6 +174,7 @@ export async function generatePRContent(params: {
     changedFiles,
     diff: truncatedDiff,
     customInstructions: config.descriptionInstructions,
+    currentTitle,
   });
 
   const result = await generateObject({

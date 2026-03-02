@@ -342,6 +342,8 @@ const existingPRSchema = z.object({
   state: z.string(),
   url: z.string(),
   number: z.number(),
+  title: z.string(),
+  baseRefName: z.string(),
 });
 
 export type ExistingPR = z.infer<typeof existingPRSchema>;
@@ -378,7 +380,14 @@ export async function checkExistingPR(
 ): Promise<ExistingPR | null> {
   const result = await runCmd(
     null,
-    ['gh', 'pr', 'view', branch, '--json', 'state,url,number'],
+    [
+      'gh',
+      'pr',
+      'view',
+      branch,
+      '--json',
+      'state,url,number,title,baseRefName',
+    ],
     { silent: true, noCiColorForce: true },
   );
 
@@ -428,6 +437,27 @@ export function buildCompareUrl(params: CompareUrlParams): string {
   return `${baseUrl}?${queryParams.toString()}`;
 }
 
+export async function updatePR(params: {
+  prNumber: number;
+  body: string;
+  title?: string;
+}): Promise<void> {
+  const args = [
+    'gh',
+    'pr',
+    'edit',
+    String(params.prNumber),
+    '--body',
+    params.body,
+  ];
+
+  if (params.title) {
+    args.push('--title', params.title);
+  }
+
+  await runCmdUnwrap(null, args);
+}
+
 export async function getRepoUrl(): Promise<string> {
   const { owner, repo } = await git.getRepoInfo();
   return `https://github.com/${owner}/${repo}`;
@@ -445,6 +475,7 @@ export const github = {
   getLatestPRReviewComment,
   parsePreviousReviewIssues,
   createPR,
+  updatePR,
   checkExistingPR,
   checkBranchPushed,
   pushBranch,

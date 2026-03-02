@@ -7,7 +7,7 @@ AI-powered CLI tool that uses OpenAI and Google Gemini models to review code cha
 - Multiple AI models: GPT-5, GPT-5-mini, GPT-4o-mini, Gemini 2.5 Pro, Gemini 2.0 Flash
 - Configurable review setups from light to heavy
 - Custom setups with full control over reviewer and validator models
-- Six commands: `commit` for AI commit messages, `review-code-changes` for local development, `advanced-review-changes` for guided/customized local review focus, `review-pr` for CI, `create-pr` for PR creation, `set-global-envs` for global API key setup
+- Seven commands: `commit` for AI commit messages, `review-code-changes` for local development, `advanced-review-changes` for guided/customized local review focus, `review-pr` for CI, `create-pr` for PR creation, `sync-pr-description` for updating existing PR descriptions, `set-global-envs` for global API key setup
 - Parallel reviews with a single structured validation pass for higher accuracy
 - Optional provider-aware concurrency limits for reviewer fan-out
 - AI-generated commit messages with interactive editing
@@ -196,6 +196,40 @@ ai-cmds create-pr --title "Fix login validation"
   - **Regenerate** — provide additional context and re-generate the description
   - **Cancel** — exit without creating a PR
 - When using `--no-ai` or if AI generation fails, opens the browser directly
+
+### `sync-pr-description` - Sync PR Description
+
+Update an existing PR's description (and optionally title) with AI-generated content based on the latest diff.
+
+```bash
+# Sync PR description with latest changes
+ai-cmds sync-pr-description
+
+# Sync using a specific base branch
+ai-cmds sync-pr-description --base develop
+
+# Preview updated description without applying
+ai-cmds sync-pr-description --dry-run
+```
+
+**Arguments:**
+
+- `--base` - Base branch for diff comparison (defaults to config or PR's base branch)
+- `--dry-run` - Preview updated description without applying changes
+
+**Behavior:**
+
+- Requires an open PR for the current branch (exit if none found)
+- Automatically pushes unpushed commits before generating
+- Resolves base branch from: `--base` flag > config `createPR.baseBranch` > PR's own base branch
+- Uses the same AI generation pipeline and config as `create-pr`
+- Passes the existing PR title as context to the AI for better results
+- After generation, shows a preview with interactive options:
+  - **Update description only** — updates the PR body via `gh pr edit`
+  - **Update description + title** — updates both title and body
+  - **Edit suggested title** — edit the suggested title before updating
+  - **Regenerate** — provide additional context and re-generate
+  - **Cancel** — exit without changes
 
 ### `set-global-envs` - Global API Key Setup
 
