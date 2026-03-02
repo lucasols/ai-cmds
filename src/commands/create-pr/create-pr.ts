@@ -269,7 +269,15 @@ export const createPRCommand = createCmd({
             // Browser open is best-effort
           }
         } catch (error) {
-          console.error('\n❌ Failed to create PR:', error);
+          console.error('\n❌ Failed to create PR via CLI:', error);
+          console.log('   Falling back to browser...\n');
+
+          await openCompareUrl({
+            baseBranch,
+            currentBranch,
+            prTitle,
+            prBody,
+          });
         }
         return;
       }

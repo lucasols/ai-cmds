@@ -346,11 +346,6 @@ const existingPRSchema = z.object({
 
 export type ExistingPR = z.infer<typeof existingPRSchema>;
 
-const createPRResultSchema = z.object({
-  url: z.string(),
-  number: z.number(),
-});
-
 export async function createPR(params: {
   baseBranch: string;
   title: string;
@@ -366,11 +361,16 @@ export async function createPR(params: {
     params.title,
     '--body',
     params.body,
-    '--json',
-    'url,number',
   ]);
 
-  return createPRResultSchema.parse(JSON.parse(result));
+  const url = result.trim();
+  const prNumberMatch = /\/pull\/(\d+)$/.exec(url);
+
+  if (!prNumberMatch) {
+    throw new Error(`Unexpected gh pr create output: ${url}`);
+  }
+
+  return { url, number: Number(prNumberMatch[1]) };
 }
 
 export async function checkExistingPR(
