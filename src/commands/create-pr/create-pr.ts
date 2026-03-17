@@ -340,17 +340,6 @@ async function resolveBaseBranchWithPrompt(
     showErrorAndExit('No other branches found to compare against');
   }
 
-  const preferredBaseBranch = await git.detectBaseBranchFromForkPoint(
-    currentBranch,
-    ['main', 'master', 'develop'].filter((branch) =>
-      otherBranches.includes(branch),
-    ),
-  );
-
-  if (preferredBaseBranch) {
-    return preferredBaseBranch;
-  }
-
   return cliInput.select('Select the base branch', {
     options: otherBranches.map((branch) => ({
       value: branch,
