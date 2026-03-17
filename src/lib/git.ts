@@ -1,6 +1,7 @@
 import { execSync } from 'child_process';
 import {
   runCmd,
+  runCmdSilent,
   runCmdSilentUnwrap,
   runCmdUnwrap,
 } from '@ls-stack/node-utils/runShellCmd';
@@ -132,6 +133,59 @@ export async function getLocalBranches(): Promise<string[]> {
     .sort((a, b) => a.length - b.length);
 }
 
+async function getCommitTimestamp(ref: string): Promise<number | undefined> {
+  const result = await runCmdSilent(['git', 'show', '-s', '--format=%ct', ref]);
+
+  if (result.error) {
+    return undefined;
+  }
+
+  const timestamp = Number.parseInt(result.stdout.trim(), 10);
+  return Number.isFinite(timestamp) ? timestamp : undefined;
+}
+
+export async function detectBaseBranchFromForkPoint(
+  currentBranch: string,
+  candidateBranches: string[],
+): Promise<string | undefined> {
+  const candidates = candidateBranches.filter(
+    (branch) => branch !== currentBranch,
+  );
+
+  const forkPoints = await Promise.all(
+    candidates.map(async (branch) => {
+      const result = await runCmd(
+        null,
+        ['git', 'merge-base', '--fork-point', branch, 'HEAD'],
+        { silent: true },
+      );
+
+      if (result.error) {
+        return undefined;
+      }
+
+      const forkPoint = result.stdout.trim();
+      if (!forkPoint) {
+        return undefined;
+      }
+
+      const timestamp = await getCommitTimestamp(forkPoint);
+      if (timestamp === undefined) {
+        return undefined;
+      }
+
+      return { branch, timestamp };
+    }),
+  );
+
+  return forkPoints
+    .filter(
+      (candidate): candidate is { branch: string; timestamp: number } =>
+        candidate !== undefined,
+    )
+    .sort((a, b) => b.timestamp - a.timestamp)[0]?.branch;
+}
+
 export async function getRepoInfo(): Promise<{ owner: string; repo: string }> {
   const result = await runCmd(
     null,
@@ -223,6 +277,7 @@ export const git = {
   getRemoteUrl,
   getRepoInfo,
   getLocalBranches,
+  detectBaseBranchFromForkPoint,
   stageAll,
   commit,
   hasChanges,
