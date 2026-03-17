@@ -92,8 +92,8 @@ async function resolveModel(
 
   const { openai } = await import('@ai-sdk/openai');
   return {
-    model: openai('gpt-5-mini'),
-    label: 'gpt-5-mini',
+    model: openai('gpt-5.4-mini'),
+    label: 'gpt-5.4-mini',
     providerOptions: undefined,
   };
 }

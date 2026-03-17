@@ -4,7 +4,7 @@ AI-powered CLI tool that uses OpenAI and Google Gemini models to review code cha
 
 ## Features
 
-- Multiple AI models: GPT-5, GPT-5-mini, GPT-4o-mini, Gemini 2.5 Pro, Gemini 2.0 Flash
+- Multiple AI models: GPT-5, GPT-5.4-mini, GPT-4o-mini, Gemini 2.5 Pro, Gemini 2.0 Flash
 - Configurable review setups from light to heavy
 - Custom setups with full control over reviewer and validator models
 - Seven commands: `commit` for AI commit messages, `review-code-changes` for local development, `advanced-review-changes` for guided/customized local review focus, `review-pr` for CI, `create-pr` for PR creation, `sync-pr-description` for updating existing PR descriptions, `set-global-envs` for global API key setup
@@ -36,7 +36,7 @@ pnpm add ai-cmds
 
 ### `commit` - AI Commit Messages
 
-Generate commit messages from staged changes using AI (Gemini primary, GPT-5-mini fallback).
+Generate commit messages from staged changes using AI (Gemini primary, GPT-5.4-mini fallback).
 
 ```bash
 # Generate commit message and commit
@@ -388,7 +388,7 @@ By default, the global `~/.config/ai-cmds/.env` is loaded first (see [`set-globa
 | Option            | Description                                                                           |
 | ----------------- | ------------------------------------------------------------------------------------- |
 | `primaryModel`    | Custom AI model for commit message generation (default: Gemini 2.5 Flash)             |
-| `fallbackModel`   | Fallback AI model if primary fails (default: GPT-5-mini)                              |
+| `fallbackModel`   | Fallback AI model if primary fails (default: GPT-5.4-mini)                            |
 | `maxDiffTokens`   | Maximum tokens from diff to include in AI prompt (default: 10000)                     |
 | `excludePatterns` | Additional glob patterns to exclude from diff (merged with default lockfile patterns) |
 | `instructions`    | Custom instructions for AI commit message generation                                  |
@@ -442,7 +442,7 @@ export default defineConfig({
       {
         id: 'fastReview',
         label: 'fastReview',
-        reviewers: [{ model: openai('gpt-5-mini') }],
+        reviewers: [{ model: openai('gpt-5.4-mini') }],
         // validator uses defaultValidator
       },
     ],

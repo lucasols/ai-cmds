@@ -228,7 +228,7 @@ export type CommitConfig = {
 
   /**
    * Fallback AI model if the primary model fails.
-   * Defaults to OpenAI GPT-5-mini.
+   * Defaults to OpenAI GPT-5.4-mini.
    */
   fallbackModel?: CustomModelConfig;
 
