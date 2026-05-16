@@ -99,14 +99,31 @@ function truncateDiff(diff: string, maxTokens: number): string {
   return `${truncated}\n\n... (diff truncated, ${tokenCount - maxTokens} tokens omitted)`;
 }
 
-export type AIProvider = 'openai' | 'google';
+export type AIProvider = 'openai' | 'google' | 'cerebras' | 'groq';
+
+const PROVIDER_API_KEY_ENV: Record<AIProvider, string> = {
+  openai: 'OPENAI_API_KEY',
+  google: 'GOOGLE_GENERATIVE_AI_API_KEY',
+  cerebras: 'CEREBRAS_API_KEY',
+  groq: 'GROQ_API_KEY',
+};
+
+export function hasProviderApiKey(provider: AIProvider): boolean {
+  return Boolean(process.env[PROVIDER_API_KEY_ENV[provider]]);
+}
 
 export function detectAvailableProvider(): AIProvider | null {
-  if (process.env.OPENAI_API_KEY) {
+  if (hasProviderApiKey('openai')) {
     return 'openai';
   }
-  if (process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+  if (hasProviderApiKey('google')) {
     return 'google';
+  }
+  if (hasProviderApiKey('cerebras')) {
+    return 'cerebras';
+  }
+  if (hasProviderApiKey('groq')) {
+    return 'groq';
   }
   return null;
 }
@@ -122,10 +139,26 @@ export async function getModel(
     };
   }
 
+  if (provider === 'cerebras') {
+    const { cerebras } = await import('@ai-sdk/cerebras');
+    return {
+      model: cerebras('gpt-oss-120b'),
+      label: 'cerebras/gpt-oss-120b',
+    };
+  }
+
+  if (provider === 'groq') {
+    const { groq } = await import('@ai-sdk/groq');
+    return {
+      model: groq('openai/gpt-oss-20b'),
+      label: 'groq/gpt-oss-20b',
+    };
+  }
+
   const { google } = await import('@ai-sdk/google');
   return {
-    model: google('gemini-2.5-flash'),
-    label: 'gemini-2.5-flash',
+    model: google('gemini-2.5-flash-lite'),
+    label: 'gemini-2.5-flash-lite',
   };
 }
 
@@ -141,15 +174,8 @@ export async function generatePRContent(params: {
   const preferredProvider = config.preferredProvider;
   let provider: AIProvider | null = null;
 
-  if (preferredProvider) {
-    const hasKey =
-      preferredProvider === 'openai' ?
-        Boolean(process.env.OPENAI_API_KEY)
-      : Boolean(process.env.GOOGLE_GENERATIVE_AI_API_KEY);
-
-    if (hasKey) {
-      provider = preferredProvider;
-    }
+  if (preferredProvider && hasProviderApiKey(preferredProvider)) {
+    provider = preferredProvider;
   }
 
   if (!provider) {
@@ -158,7 +184,7 @@ export async function generatePRContent(params: {
 
   if (!provider) {
     throw new Error(
-      'No AI provider available. Set OPENAI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY.',
+      'No AI provider available. Set one of OPENAI_API_KEY, GOOGLE_GENERATIVE_AI_API_KEY, CEREBRAS_API_KEY, or GROQ_API_KEY.',
     );
   }
 

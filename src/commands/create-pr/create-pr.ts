@@ -127,7 +127,7 @@ export const createPRCommand = createCmd({
       const provider = detectAvailableProvider();
       if (!provider) {
         console.log(
-          '\n⚠️  No AI provider configured. Set OPENAI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY.',
+          '\n⚠️  No AI provider configured. Set one of OPENAI_API_KEY, GOOGLE_GENERATIVE_AI_API_KEY, CEREBRAS_API_KEY, or GROQ_API_KEY.',
         );
         console.log('   Falling back to template-only mode.\n');
       } else {

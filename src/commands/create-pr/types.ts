@@ -19,7 +19,7 @@ export type CreatePRConfig = {
    * Preferred AI provider for generating PR descriptions.
    * The tool will auto-detect available providers based on API keys if not specified.
    */
-  preferredProvider?: 'openai' | 'google';
+  preferredProvider?: 'openai' | 'google' | 'cerebras' | 'groq';
 
   /**
    * Custom instructions to include in the AI prompt for generating descriptions.

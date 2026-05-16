@@ -100,7 +100,7 @@ export const syncPRDescriptionCommand = createCmd({
     const provider = detectAvailableProvider();
     if (!provider) {
       showErrorAndExit(
-        'No AI provider available. Set OPENAI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY.',
+        'No AI provider available. Set one of OPENAI_API_KEY, GOOGLE_GENERATIVE_AI_API_KEY, CEREBRAS_API_KEY, or GROQ_API_KEY.',
       );
     }
 

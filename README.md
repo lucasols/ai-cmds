@@ -29,14 +29,19 @@ pnpm add ai-cmds
 
 - Node.js >= 25.0.0
 - `gh` CLI for GitHub PR operations
-- `OPENAI_API_KEY` environment variable (for OpenAI setups)
-- `GOOGLE_GENERATIVE_AI_API_KEY` environment variable (for Google setups)
+- An API key for at least one supported provider:
+  - `OPENAI_API_KEY` (OpenAI)
+  - `GOOGLE_GENERATIVE_AI_API_KEY` (Google Gemini)
+  - `CEREBRAS_API_KEY` (Cerebras)
+  - `GROQ_API_KEY` (Groq)
 
 ## Commands
 
 ### `commit` - AI Commit Messages
 
-Generate commit messages from staged changes using AI (Gemini primary, GPT-5.4-mini fallback).
+Generate commit messages from staged changes using AI (Gemini 2.5 Flash Lite primary, GPT-5.4-mini fallback by default).
+
+The built-in primary provider can be changed with the `AI_CLI_COMMIT_PROVIDER` env var (`google` | `openai` | `cerebras` | `groq`), e.g. in the global `~/.config/ai-cmds/.env`. A distinct fallback provider is chosen automatically. Custom `primaryModel`/`fallbackModel` config still takes precedence.
 
 ```bash
 # Generate commit message and commit
@@ -241,7 +246,7 @@ ai-cmds set-global-envs
 
 **Behavior:**
 
-- Creates `~/.config/ai-cmds/.env` with commented-out placeholders for `OPENAI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, and `AI_CLI_LOGS_DIR`
+- Creates `~/.config/ai-cmds/.env` with commented-out placeholders for `OPENAI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, `CEREBRAS_API_KEY`, `GROQ_API_KEY`, `AI_CLI_LOGS_DIR`, and `AI_CLI_COMMIT_PROVIDER`
 - If the file already exists, reports its location without overwriting
 - The global `.env` is always loaded first, then the local `.env` overrides any overlapping variables
 
@@ -344,6 +349,17 @@ export default defineConfig({
 
 By default, the global `~/.config/ai-cmds/.env` is loaded first (see [`set-global-envs`](#set-global-envs---global-api-key-setup)), then the local `.env` is loaded and overrides any overlapping variables. This allows you to set shared API keys globally while still customizing per-project.
 
+Recognized environment variables:
+
+| Variable                       | Description                                                                                          |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `OPENAI_API_KEY`               | API key for OpenAI models                                                                            |
+| `GOOGLE_GENERATIVE_AI_API_KEY` | API key for Google Gemini models                                                                     |
+| `CEREBRAS_API_KEY`             | API key for Cerebras models                                                                          |
+| `GROQ_API_KEY`                 | API key for Groq models                                                                              |
+| `AI_CLI_COMMIT_PROVIDER`       | Built-in provider for the `commit` command: `google` (default), `openai`, `cerebras`, or `groq`      |
+| `AI_CLI_LOGS_DIR`              | Directory for review run artifacts (overridden by `codeReview.logsDir`)                              |
+
 ### Configuration Options
 
 #### Root Options
@@ -378,7 +394,7 @@ By default, the global `~/.config/ai-cmds/.env` is loaded first (see [`set-globa
 | ------------------------- | ------------------------------------------------------------------------------- |
 | `templatePath`            | Path to PR template file (default: `.github/pull_request_template.md`)          |
 | `baseBranch`              | Base branch for the PR. Can be a string or function `(currentBranch) => string` |
-| `preferredProvider`       | Preferred AI provider: `'openai'` or `'google'` (auto-detects if not set)       |
+| `preferredProvider`       | Preferred AI provider: `'openai'`, `'google'`, `'cerebras'`, or `'groq'` (auto-detects if not set) |
 | `descriptionInstructions` | Custom instructions for AI description generation                               |
 | `diffExcludePatterns`     | Glob patterns for files to exclude from diff                                    |
 | `maxDiffTokens`           | Maximum tokens from diff to include in AI prompt (default: 50000)               |
@@ -387,8 +403,8 @@ By default, the global `~/.config/ai-cmds/.env` is loaded first (see [`set-globa
 
 | Option            | Description                                                                           |
 | ----------------- | ------------------------------------------------------------------------------------- |
-| `primaryModel`    | Custom AI model for commit message generation (default: Gemini 2.5 Flash)             |
-| `fallbackModel`   | Fallback AI model if primary fails (default: GPT-5.4-mini)                            |
+| `primaryModel`    | Custom AI model for commit message generation (default: built-in model from the provider in `AI_CLI_COMMIT_PROVIDER`, Gemini 2.5 Flash Lite when unset) |
+| `fallbackModel`   | Fallback AI model if primary fails (default: a built-in model from a provider distinct from the primary, e.g. GPT-5.4-mini) |
 | `maxDiffTokens`   | Maximum tokens from diff to include in AI prompt (default: 10000)                     |
 | `excludePatterns` | Additional glob patterns to exclude from diff (merged with default lockfile patterns) |
 | `instructions`    | Custom instructions for AI commit message generation                                  |

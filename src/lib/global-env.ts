@@ -7,7 +7,13 @@ const GLOBAL_ENV_TEMPLATE = `# ai-cmds global environment variables
 
 # OPENAI_API_KEY=
 # GOOGLE_GENERATIVE_AI_API_KEY=
+# CEREBRAS_API_KEY=
+# GROQ_API_KEY=
 # AI_CLI_LOGS_DIR=
+
+# Default provider for the \`commit\` command (built-in model).
+# One of: google | openai | cerebras | groq (defaults to google)
+# AI_CLI_COMMIT_PROVIDER=
 `;
 
 export function getGlobalEnvPath(): string {

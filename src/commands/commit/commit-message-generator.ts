@@ -69,9 +69,38 @@ type ResolvedModel = {
   providerOptions: Record<string, Record<string, JSONValue>> | undefined;
 };
 
+const COMMIT_PROVIDERS = ['google', 'openai', 'cerebras', 'groq'] as const;
+
+type CommitProvider = (typeof COMMIT_PROVIDERS)[number];
+
+function isCommitProvider(value: string): value is CommitProvider {
+  return COMMIT_PROVIDERS.some((provider) => provider === value);
+}
+
+/**
+ * Resolves the built-in primary provider for commit messages.
+ *
+ * Overridable via the `AI_CLI_COMMIT_PROVIDER` env var (e.g. in the global
+ * `~/.config/ai-cmds/.env`). Falls back to Google when unset or invalid.
+ */
+function getDefaultCommitProvider(): CommitProvider {
+  const raw = process.env.AI_CLI_COMMIT_PROVIDER?.trim().toLowerCase();
+
+  if (raw && isCommitProvider(raw)) {
+    return raw;
+  }
+
+  return 'google';
+}
+
+/** Pick a built-in fallback provider that differs from the primary one. */
+function getFallbackCommitProvider(primary: CommitProvider): CommitProvider {
+  return primary === 'openai' ? 'google' : 'openai';
+}
+
 async function resolveModel(
   customModel: CustomModelConfig | undefined,
-  fallbackProvider: 'google' | 'openai',
+  defaultProvider: CommitProvider,
 ): Promise<ResolvedModel> {
   if (customModel) {
     return {
@@ -81,11 +110,29 @@ async function resolveModel(
     };
   }
 
-  if (fallbackProvider === 'google') {
+  if (defaultProvider === 'google') {
     const { google } = await import('@ai-sdk/google');
     return {
-      model: google('gemini-2.5-flash'),
-      label: 'gemini-2.5-flash',
+      model: google('gemini-2.5-flash-lite'),
+      label: 'gemini-2.5-flash-lite',
+      providerOptions: undefined,
+    };
+  }
+
+  if (defaultProvider === 'cerebras') {
+    const { cerebras } = await import('@ai-sdk/cerebras');
+    return {
+      model: cerebras('gpt-oss-120b'),
+      label: 'cerebras/gpt-oss-120b',
+      providerOptions: undefined,
+    };
+  }
+
+  if (defaultProvider === 'groq') {
+    const { groq } = await import('@ai-sdk/groq');
+    return {
+      model: groq('openai/gpt-oss-20b'),
+      label: 'groq/gpt-oss-20b',
       providerOptions: undefined,
     };
   }
@@ -105,7 +152,8 @@ export async function generateCommitMessage(
 ): Promise<string> {
   const userPrompt = buildUserPrompt(changedFiles, diff, config.instructions);
 
-  const primary = await resolveModel(config.primaryModel, 'google');
+  const primaryProvider = getDefaultCommitProvider();
+  const primary = await resolveModel(config.primaryModel, primaryProvider);
 
   try {
     console.log(
@@ -136,7 +184,10 @@ export async function generateCommitMessage(
       `⚠️  Primary model (${primary.label}) failed, trying fallback...`,
     );
 
-    const fallback = await resolveModel(config.fallbackModel, 'openai');
+    const fallback = await resolveModel(
+      config.fallbackModel,
+      getFallbackCommitProvider(primaryProvider),
+    );
 
     console.log(
       `🤖 Generating commit message with ${fallback.label} (effort: ${getModelEffort(fallback.providerOptions)})...`,

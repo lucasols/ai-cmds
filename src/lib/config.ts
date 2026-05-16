@@ -198,7 +198,7 @@ export type CreatePRConfig = {
    * Preferred AI provider for generating PR descriptions.
    * The tool will auto-detect available providers based on API keys if not specified.
    */
-  preferredProvider?: 'openai' | 'google';
+  preferredProvider?: 'openai' | 'google' | 'cerebras' | 'groq';
 
   /**
    * Custom instructions to include in the AI prompt for generating descriptions.
@@ -222,13 +222,20 @@ export type CreatePRConfig = {
 export type CommitConfig = {
   /**
    * Custom AI model for generating commit messages.
-   * Defaults to Google Gemini 2.5 Flash.
+   *
+   * When not set, a built-in default model is used. The built-in provider is
+   * `google` (Gemini 2.5 Flash) by default and can be changed via the
+   * `AI_CLI_COMMIT_PROVIDER` env var (e.g. in the global
+   * `~/.config/ai-cmds/.env`): `google` | `openai` | `cerebras` | `groq`.
    */
   primaryModel?: CustomModelConfig;
 
   /**
    * Fallback AI model if the primary model fails.
-   * Defaults to OpenAI GPT-5.4-mini.
+   *
+   * When not set, a built-in default is used that differs from the resolved
+   * primary provider (e.g. OpenAI GPT-5.4-mini, or Gemini 2.5 Flash when the
+   * primary provider is OpenAI).
    */
   fallbackModel?: CustomModelConfig;
 
