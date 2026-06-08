@@ -29,6 +29,12 @@ export const createPRCommand = createCmd({
       name: 'dry-run',
       description: 'Preview without opening browser',
     },
+    web: {
+      type: 'flag',
+      name: 'web',
+      description:
+        'Open the GitHub compare page in the browser instead of publishing directly',
+    },
     title: {
       type: 'value-string-flag',
       name: 'title',
@@ -40,8 +46,12 @@ export const createPRCommand = createCmd({
     { args: ['--base', 'develop'], description: 'Create PR against develop' },
     { args: ['--no-ai'], description: 'Create PR using template only' },
     { args: ['--dry-run'], description: 'Preview PR without opening browser' },
+    {
+      args: ['--web'],
+      description: 'Open the GitHub compare page instead of publishing',
+    },
   ],
-  run: async ({ base, noAi, dryRun, title: titleOverride }) => {
+  run: async ({ base, noAi, dryRun, web, title: titleOverride }) => {
     const rootConfig = await loadConfig();
     const config = rootConfig.createPR ?? {};
 
@@ -170,7 +180,17 @@ export const createPRCommand = createCmd({
       return;
     }
 
-    if (!generatedContent) {
+    const separator = '─'.repeat(60);
+    console.log(`\n${separator}`);
+    console.log(`Title: ${prTitle}`);
+    if (generatedContent) {
+      console.log(`Summary: ${generatedContent.summary}`);
+    }
+    console.log(separator);
+
+    const ghAvailable = !web && (await github.isGhAvailable());
+
+    if (!ghAvailable) {
       await openCompareUrl({
         baseBranch,
         currentBranch,
@@ -180,109 +200,19 @@ export const createPRCommand = createCmd({
       return;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    while (true) {
-      const separator = '─'.repeat(60);
-      console.log(`\n${separator}`);
-      console.log(`Title: ${prTitle}`);
-      console.log(`Summary: ${generatedContent.summary}`);
-      console.log(separator);
+    console.log(`\n📤 Creating PR...`);
 
-      const options = [
-        { value: 'open' as const, label: 'Open in browser' },
-        { value: 'publish' as const, label: 'Publish PR' },
-        { value: 'editTitle' as const, label: 'Edit title' },
-        ...(aiAvailable ?
-          [{ value: 'regenerate' as const, label: 'Regenerate' }]
-        : []),
-        { value: 'cancel' as const, label: 'Cancel' },
-      ];
-
-      const action = await cliInput.select('What would you like to do?', {
-        options,
+    let pr: Awaited<ReturnType<typeof github.createPR>>;
+    try {
+      pr = await github.createPR({
+        baseBranch,
+        title: prTitle,
+        body: prBody,
       });
+    } catch (error) {
+      console.error('\n❌ Failed to create PR via CLI:', error);
+      console.log('   Falling back to browser...\n');
 
-      if (action === 'cancel') {
-        console.log('\n🚫 Cancelled.\n');
-        return;
-      }
-
-      if (action === 'editTitle') {
-        prTitle = await cliInput.text('PR title:', { initial: prTitle });
-        continue;
-      }
-
-      if (action === 'regenerate') {
-        const extraContext = await cliInput.text(
-          'Additional context for regeneration (leave empty to just retry):',
-        );
-
-        console.log(`\n🤖 Regenerating PR description...`);
-
-        const regenerateConfig = {
-          ...config,
-          ...(extraContext.trim() && {
-            descriptionInstructions: [
-              config.descriptionInstructions,
-              extraContext.trim(),
-            ]
-              .filter(Boolean)
-              .join('\n'),
-          }),
-        };
-
-        try {
-          generatedContent = await generatePRContent({
-            branchName: currentBranch,
-            changedFiles: filteredFiles,
-            diff,
-            config: regenerateConfig,
-          });
-
-          if (!titleOverride) {
-            prTitle = generatedContent.title;
-          }
-
-          prBody = buildPRBody(template, generatedContent);
-          console.log(`✅ Description regenerated successfully.`);
-        } catch (error) {
-          console.error('\n❌ Failed to regenerate PR description:', error);
-        }
-        continue;
-      }
-
-      if (action === 'publish') {
-        console.log(`\n📤 Creating PR...`);
-
-        try {
-          const pr = await github.createPR({
-            baseBranch,
-            title: prTitle,
-            body: prBody,
-          });
-
-          console.log(`\n✅ PR #${pr.number} created: ${pr.url}`);
-
-          try {
-            await open(pr.url);
-          } catch {
-            // Browser open is best-effort
-          }
-        } catch (error) {
-          console.error('\n❌ Failed to create PR via CLI:', error);
-          console.log('   Falling back to browser...\n');
-
-          await openCompareUrl({
-            baseBranch,
-            currentBranch,
-            prTitle,
-            prBody,
-          });
-        }
-        return;
-      }
-
-      // action === 'open'
       await openCompareUrl({
         baseBranch,
         currentBranch,
@@ -290,6 +220,100 @@ export const createPRCommand = createCmd({
         prBody,
       });
       return;
+    }
+
+    console.log(`\n✅ PR #${pr.number} created: ${pr.url}`);
+    console.log(`\n🌐 Opening PR in browser...`);
+    await open(pr.url).catch(() => {
+      // Browser open is best-effort
+    });
+
+    for (;;) {
+      const options = [
+        { value: 'done' as const, label: 'Done' },
+        { value: 'editTitle' as const, label: 'Edit title' },
+        ...(aiAvailable ?
+          [{ value: 'regenerate' as const, label: 'Regenerate description' }]
+        : []),
+        { value: 'open' as const, label: 'Open in browser' },
+      ];
+
+      const action = await cliInput.select(
+        'PR created. What would you like to do?',
+        { options },
+      );
+
+      if (action === 'done') {
+        console.log('\n✅ Done.\n');
+        return;
+      }
+
+      if (action === 'open') {
+        await open(pr.url).catch(() => {
+          console.log(`\n📋 Could not open browser. Use this URL:`);
+          console.log(pr.url);
+        });
+        continue;
+      }
+
+      if (action === 'editTitle') {
+        prTitle = await cliInput.text('PR title:', { initial: prTitle });
+
+        try {
+          await github.updatePR({
+            prNumber: pr.number,
+            title: prTitle,
+            body: prBody,
+          });
+          console.log(`✅ Title updated.`);
+        } catch (error) {
+          console.error('\n❌ Failed to update PR:', error);
+        }
+        continue;
+      }
+
+      // action === 'regenerate'
+      const extraContext = await cliInput.text(
+        'Additional context for regeneration (leave empty to just retry):',
+      );
+
+      console.log(`\n🤖 Regenerating PR description...`);
+
+      const regenerateConfig = {
+        ...config,
+        ...(extraContext.trim() && {
+          descriptionInstructions: [
+            config.descriptionInstructions,
+            extraContext.trim(),
+          ]
+            .filter(Boolean)
+            .join('\n'),
+        }),
+      };
+
+      try {
+        generatedContent = await generatePRContent({
+          branchName: currentBranch,
+          changedFiles: filteredFiles,
+          diff,
+          config: regenerateConfig,
+        });
+
+        if (!titleOverride) {
+          prTitle = generatedContent.title;
+        }
+
+        prBody = buildPRBody(template, generatedContent);
+
+        await github.updatePR({
+          prNumber: pr.number,
+          title: prTitle,
+          body: prBody,
+        });
+        console.log(`✅ Description regenerated and PR updated.`);
+      } catch (error) {
+        console.error('\n❌ Failed to regenerate PR description:', error);
+      }
     }
   },
 });

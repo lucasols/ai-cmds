@@ -177,6 +177,9 @@ ai-cmds create-pr --no-ai
 # Preview without opening browser
 ai-cmds create-pr --dry-run
 
+# Open the GitHub compare page instead of publishing directly
+ai-cmds create-pr --web
+
 # Override the PR title
 ai-cmds create-pr --title "Fix login validation"
 ```
@@ -186,6 +189,7 @@ ai-cmds create-pr --title "Fix login validation"
 - `--base` - Base branch for the PR (if not specified, uses config or prompts)
 - `--no-ai` - Skip AI generation and use template only
 - `--dry-run` - Preview PR content without opening browser
+- `--web` - Open the GitHub compare page in the browser instead of publishing directly
 - `--title` - Override the AI-generated PR title
 
 **Behavior:**
@@ -194,13 +198,12 @@ ai-cmds create-pr --title "Fix login validation"
 - Automatically pushes the branch if not already pushed
 - Uses PR template from `.github/pull_request_template.md` (configurable)
 - Supports `<!-- AI_DESCRIPTION -->` marker in templates for AI content placement
-- After AI generation, shows a preview with interactive options:
-  - **Open in browser** — opens GitHub compare URL with pre-filled title and body
-  - **Publish PR** — creates the PR via `gh pr create` and opens it in the browser
-  - **Edit title** — edit the AI-generated title before publishing
-  - **Regenerate** — provide additional context and re-generate the description
-  - **Cancel** — exit without creating a PR
-- When using `--no-ai` or if AI generation fails, opens the browser directly
+- By default, when the `gh` CLI is available, publishes the PR directly via `gh pr create` and opens it in the browser, then shows interactive options to edit it after creation:
+  - **Done** — finish
+  - **Edit title** — update the PR title via `gh pr edit`
+  - **Regenerate description** — provide additional context, re-generate, and update the PR body
+  - **Open in browser** — reopen the published PR in the browser
+- When the `gh` CLI is unavailable, when `--web` is used, or if PR creation fails, opens the GitHub compare URL with the pre-filled title and body so you can complete the PR in the browser
 
 ### `sync-pr-description` - Sync PR Description
 

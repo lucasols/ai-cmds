@@ -402,6 +402,11 @@ export async function checkExistingPR(
   }
 }
 
+export async function isGhAvailable(): Promise<boolean> {
+  const result = await runCmdSilent(['gh', '--version']);
+  return !result.error;
+}
+
 export async function checkBranchPushed(branch: string): Promise<boolean> {
   const result = await runCmdSilent([
     'git',
@@ -476,6 +481,7 @@ export const github = {
   parsePreviousReviewIssues,
   createPR,
   updatePR,
+  isGhAvailable,
   checkExistingPR,
   checkBranchPushed,
   pushBranch,
