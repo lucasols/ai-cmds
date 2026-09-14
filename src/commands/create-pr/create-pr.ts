@@ -23,7 +23,7 @@ export const createPRCommand = createCmd({
       type: 'flag',
       name: 'auto-base',
       description:
-        'Auto-detect the base branch (the closest ancestor among local branches)',
+        'Auto-detect the base branch (the closest ancestor among remote branches on origin)',
     },
     draft: {
       type: 'flag',
@@ -411,6 +411,23 @@ async function openCompareUrl(params: {
   console.log(`\n✅ Done! Complete the PR creation in your browser.`);
 }
 
+/**
+ * Among branches git cannot tell apart, skip the ones whose latest PR was
+ * merged: they are leftovers of previous PRs, not bases.
+ */
+async function findMergedPRHeads(branches: string[]): Promise<string[]> {
+  if (!(await github.isGhAvailable())) return [];
+
+  const merged: string[] = [];
+
+  for (const branch of branches) {
+    const pr = await github.checkExistingPR(branch);
+    if (pr?.state === 'MERGED') merged.push(branch);
+  }
+
+  return merged;
+}
+
 async function resolveBaseBranchWithPrompt(params: {
   argBaseBranch: string | undefined;
   autoBase: boolean;
@@ -422,9 +439,15 @@ async function resolveBaseBranchWithPrompt(params: {
   if (argBaseBranch) return argBaseBranch;
 
   if (autoBase) {
-    console.log(`\n🔎 Auto-detecting base branch...`);
+    console.log(`\n🔎 Auto-detecting base branch from origin...`);
 
-    const detected = await git.findClosestBaseBranch(currentBranch);
+    await git.fetchRemote().catch(() => {
+      // Best-effort: fall back to the existing remote-tracking refs
+    });
+
+    const detected = await git.findClosestBaseBranch(currentBranch, {
+      resolveTiedBranches: findMergedPRHeads,
+    });
 
     if (detected) {
       console.log(

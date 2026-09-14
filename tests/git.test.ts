@@ -34,6 +34,15 @@ describe('pickClosestBaseBranch', () => {
     ).toBeNull();
   });
 
+  it('skips candidates already merged into another candidate', () => {
+    expect(
+      pickClosestBaseBranch([
+        { branch: 'feat/merged', distance: 2, alreadyMerged: true },
+        { branch: 'release/2.0', distance: 2 },
+      ]),
+    ).toEqual({ branch: 'release/2.0', distance: 2 });
+  });
+
   it('prefers well-known base names on ties', () => {
     expect(
       pickClosestBaseBranch([
