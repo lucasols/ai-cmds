@@ -1,6 +1,7 @@
 import { execSync } from 'child_process';
 import {
   runCmd,
+  runCmdSilent,
   runCmdSilentUnwrap,
   runCmdUnwrap,
 } from '@ls-stack/node-utils/runShellCmd';
@@ -132,6 +133,75 @@ export async function getLocalBranches(): Promise<string[]> {
     .sort((a, b) => a.length - b.length);
 }
 
+export type BaseBranchCandidate = {
+  branch: string;
+  /** Number of commits on HEAD that are not reachable from the candidate branch */
+  distance: number;
+};
+
+const PREFERRED_BASE_BRANCHES = ['main', 'master', 'develop', 'dev'];
+
+function preferredBaseBranchIndex(branch: string): number {
+  const index = PREFERRED_BASE_BRANCHES.indexOf(branch);
+  return index === -1 ? PREFERRED_BASE_BRANCHES.length : index;
+}
+
+/**
+ * Picks the most likely base branch: the candidate with the fewest commits
+ * between its merge-base and HEAD. Candidates that already contain HEAD
+ * (distance 0) are descendants or equal to the current branch and are skipped.
+ * Ties are broken by well-known base names, then by shorter branch names.
+ */
+export function pickClosestBaseBranch(
+  candidates: BaseBranchCandidate[],
+): BaseBranchCandidate | null {
+  const sorted = candidates
+    .filter((candidate) => candidate.distance > 0)
+    .toSorted((a, b) => {
+      if (a.distance !== b.distance) return a.distance - b.distance;
+
+      const preferenceDiff =
+        preferredBaseBranchIndex(a.branch) - preferredBaseBranchIndex(b.branch);
+      if (preferenceDiff !== 0) return preferenceDiff;
+
+      if (a.branch.length !== b.branch.length) {
+        return a.branch.length - b.branch.length;
+      }
+
+      return a.branch.localeCompare(b.branch);
+    });
+
+  return sorted[0] ?? null;
+}
+
+export async function findClosestBaseBranch(
+  currentBranch: string,
+): Promise<BaseBranchCandidate | null> {
+  const branches = await getLocalBranches();
+  const candidates: BaseBranchCandidate[] = [];
+
+  for (const branch of branches) {
+    if (branch === currentBranch) continue;
+
+    const result = await runCmdSilent([
+      'git',
+      'rev-list',
+      '--count',
+      `${branch}..HEAD`,
+    ]);
+
+    if (result.error) continue;
+
+    const distance = Number.parseInt(result.stdout.trim(), 10);
+
+    if (Number.isNaN(distance)) continue;
+
+    candidates.push({ branch, distance });
+  }
+
+  return pickClosestBaseBranch(candidates);
+}
+
 export async function getRepoInfo(): Promise<{ owner: string; repo: string }> {
   const result = await runCmd(
     null,
@@ -223,6 +293,7 @@ export const git = {
   getRemoteUrl,
   getRepoInfo,
   getLocalBranches,
+  findClosestBaseBranch,
   stageAll,
   commit,
   hasChanges,

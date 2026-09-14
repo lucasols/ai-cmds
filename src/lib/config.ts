@@ -234,7 +234,7 @@ export type CommitConfig = {
    * Fallback AI model if the primary model fails.
    *
    * When not set, a built-in default is used that differs from the resolved
-   * primary provider (e.g. OpenAI GPT-5.4-mini, or Gemini 2.5 Flash when the
+   * primary provider (e.g. OpenAI GPT-5.6-luna, or Gemini 2.5 Flash when the
    * primary provider is OpenAI).
    */
   fallbackModel?: CustomModelConfig;

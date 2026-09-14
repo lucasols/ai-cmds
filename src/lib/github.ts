@@ -352,6 +352,7 @@ export async function createPR(params: {
   baseBranch: string;
   title: string;
   body: string;
+  draft?: boolean;
 }): Promise<{ url: string; number: number }> {
   const result = await ghJsonCmdUnwrap([
     'gh',
@@ -363,6 +364,7 @@ export async function createPR(params: {
     params.title,
     '--body',
     params.body,
+    ...(params.draft ? ['--draft'] : []),
   ]);
 
   const url = result.trim();
@@ -463,6 +465,19 @@ export async function updatePR(params: {
   await runCmdUnwrap(null, args);
 }
 
+export async function setPRDraft(params: {
+  prNumber: number;
+  draft: boolean;
+}): Promise<void> {
+  await runCmdUnwrap(null, [
+    'gh',
+    'pr',
+    'ready',
+    String(params.prNumber),
+    ...(params.draft ? ['--undo'] : []),
+  ]);
+}
+
 export async function getRepoUrl(): Promise<string> {
   const { owner, repo } = await git.getRepoInfo();
   return `https://github.com/${owner}/${repo}`;
@@ -481,6 +496,7 @@ export const github = {
   parsePreviousReviewIssues,
   createPR,
   updatePR,
+  setPRDraft,
   isGhAvailable,
   checkExistingPR,
   checkBranchPushed,

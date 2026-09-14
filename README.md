@@ -4,7 +4,7 @@ AI-powered CLI tool that uses OpenAI and Google Gemini models to review code cha
 
 ## Features
 
-- Multiple AI models: GPT-5, GPT-5.4-mini, GPT-4o-mini, Gemini 2.5 Pro, Gemini 2.0 Flash
+- Multiple AI models: GPT-5, GPT-5.6-luna, GPT-4o-mini, Gemini 2.5 Pro, Gemini 2.0 Flash
 - Configurable review setups from light to heavy
 - Custom setups with full control over reviewer and validator models
 - Seven commands: `commit` for AI commit messages, `review-code-changes` for local development, `advanced-review-changes` for guided/customized local review focus, `review-pr` for CI, `create-pr` for PR creation, `sync-pr-description` for updating existing PR descriptions, `set-global-envs` for global API key setup
@@ -39,7 +39,7 @@ pnpm add ai-cmds
 
 ### `commit` - AI Commit Messages
 
-Generate commit messages from staged changes using AI (Gemini 2.5 Flash Lite primary, GPT-5.4-mini fallback by default).
+Generate commit messages from staged changes using AI (Gemini 2.5 Flash Lite primary, GPT-5.6-luna fallback by default).
 
 The built-in primary provider can be changed with the `AI_CLI_COMMIT_PROVIDER` env var (`google` | `openai` | `cerebras` | `groq`), e.g. in the global `~/.config/ai-cmds/.env`. A distinct fallback provider is chosen automatically. Custom `primaryModel`/`fallbackModel` config still takes precedence.
 
@@ -171,6 +171,12 @@ ai-cmds create-pr
 # Create PR against a specific base branch
 ai-cmds create-pr --base develop
 
+# Auto-detect the base branch (closest ancestor among local branches)
+ai-cmds create-pr --auto-base
+
+# Create the PR as a draft
+ai-cmds create-pr --draft
+
 # Skip AI generation, use template only
 ai-cmds create-pr --no-ai
 
@@ -187,6 +193,8 @@ ai-cmds create-pr --title "Fix login validation"
 **Arguments:**
 
 - `--base` - Base branch for the PR (if not specified, uses config or prompts)
+- `--auto-base` - Auto-detect the base branch: picks the local branch with the fewest commits between its merge-base and `HEAD`, ignoring branches that already contain `HEAD`. Ties prefer `main`, `master`, `develop`, `dev`, then shorter names. Falls back to config or the prompt if nothing is found. `--base` takes precedence
+- `--draft` - Create the PR as a draft (with `--web` or the browser fallback, pick "Create draft pull request" in GitHub)
 - `--no-ai` - Skip AI generation and use template only
 - `--dry-run` - Preview PR content without opening browser
 - `--web` - Open the GitHub compare page in the browser instead of publishing directly
@@ -202,6 +210,7 @@ ai-cmds create-pr --title "Fix login validation"
   - **Done** — finish
   - **Edit title** — update the PR title via `gh pr edit`
   - **Regenerate description** — provide additional context, re-generate, and update the PR body
+  - **Mark as draft** / **Mark as ready for review** — toggle the PR draft state via `gh pr ready`
   - **Open in browser** — reopen the published PR in the browser
 - When the `gh` CLI is unavailable, when `--web` is used, or if PR creation fails, opens the GitHub compare URL with the pre-filled title and body so you can complete the PR in the browser
 
@@ -407,7 +416,7 @@ Recognized environment variables:
 | Option            | Description                                                                           |
 | ----------------- | ------------------------------------------------------------------------------------- |
 | `primaryModel`    | Custom AI model for commit message generation (default: built-in model from the provider in `AI_CLI_COMMIT_PROVIDER`, Gemini 2.5 Flash Lite when unset) |
-| `fallbackModel`   | Fallback AI model if primary fails (default: a built-in model from a provider distinct from the primary, e.g. GPT-5.4-mini) |
+| `fallbackModel`   | Fallback AI model if primary fails (default: a built-in model from a provider distinct from the primary, e.g. GPT-5.6-luna) |
 | `maxDiffTokens`   | Maximum tokens from diff to include in AI prompt (default: 10000)                     |
 | `excludePatterns` | Additional glob patterns to exclude from diff (merged with default lockfile patterns) |
 | `instructions`    | Custom instructions for AI commit message generation                                  |
@@ -461,7 +470,7 @@ export default defineConfig({
       {
         id: 'fastReview',
         label: 'fastReview',
-        reviewers: [{ model: openai('gpt-5.4-mini') }],
+        reviewers: [{ model: openai('gpt-5.6-luna') }],
         // validator uses defaultValidator
       },
     ],

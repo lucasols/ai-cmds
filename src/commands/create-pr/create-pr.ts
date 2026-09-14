@@ -19,6 +19,17 @@ export const createPRCommand = createCmd({
       name: 'base',
       description: 'Base branch for the PR',
     },
+    autoBase: {
+      type: 'flag',
+      name: 'auto-base',
+      description:
+        'Auto-detect the base branch (the closest ancestor among local branches)',
+    },
+    draft: {
+      type: 'flag',
+      name: 'draft',
+      description: 'Create the PR as a draft',
+    },
     noAi: {
       type: 'flag',
       name: 'no-ai',
@@ -44,6 +55,11 @@ export const createPRCommand = createCmd({
   examples: [
     { args: [], description: 'Create PR with AI-generated description' },
     { args: ['--base', 'develop'], description: 'Create PR against develop' },
+    {
+      args: ['--auto-base'],
+      description: 'Create PR against the auto-detected base branch',
+    },
+    { args: ['--draft'], description: 'Create PR as a draft' },
     { args: ['--no-ai'], description: 'Create PR using template only' },
     { args: ['--dry-run'], description: 'Preview PR without opening browser' },
     {
@@ -51,7 +67,15 @@ export const createPRCommand = createCmd({
       description: 'Open the GitHub compare page instead of publishing',
     },
   ],
-  run: async ({ base, noAi, dryRun, web, title: titleOverride }) => {
+  run: async ({
+    base,
+    autoBase,
+    draft,
+    noAi,
+    dryRun,
+    web,
+    title: titleOverride,
+  }) => {
     const rootConfig = await loadConfig();
     const config = rootConfig.createPR ?? {};
 
@@ -94,11 +118,12 @@ export const createPRCommand = createCmd({
       console.log(`✅ Branch pushed successfully.`);
     }
 
-    const baseBranch = await resolveBaseBranchWithPrompt(
-      base,
-      config.baseBranch,
+    const baseBranch = await resolveBaseBranchWithPrompt({
+      argBaseBranch: base,
+      autoBase,
+      configBaseBranch: config.baseBranch,
       currentBranch,
-    );
+    });
 
     console.log(`\n📊 Gathering changes: ${currentBranch} → ${baseBranch}`);
 
@@ -174,6 +199,7 @@ export const createPRCommand = createCmd({
       console.log(`\nTitle: ${prTitle}`);
       console.log(`Base: ${baseBranch}`);
       console.log(`Head: ${currentBranch}`);
+      console.log(`Draft: ${draft ? 'yes' : 'no'}`);
       console.log('\nBody:\n');
       console.log(prBody);
       console.log(`\n${separator}`);
@@ -196,11 +222,12 @@ export const createPRCommand = createCmd({
         currentBranch,
         prTitle,
         prBody,
+        draft,
       });
       return;
     }
 
-    console.log(`\n📤 Creating PR...`);
+    console.log(`\n📤 Creating ${draft ? 'draft ' : ''}PR...`);
 
     let pr: Awaited<ReturnType<typeof github.createPR>>;
     try {
@@ -208,6 +235,7 @@ export const createPRCommand = createCmd({
         baseBranch,
         title: prTitle,
         body: prBody,
+        draft,
       });
     } catch (error) {
       console.error('\n❌ Failed to create PR via CLI:', error);
@@ -218,11 +246,16 @@ export const createPRCommand = createCmd({
         currentBranch,
         prTitle,
         prBody,
+        draft,
       });
       return;
     }
 
-    console.log(`\n✅ PR #${pr.number} created: ${pr.url}`);
+    let isDraft = draft;
+
+    console.log(
+      `\n✅ ${isDraft ? 'Draft PR' : 'PR'} #${pr.number} created: ${pr.url}`,
+    );
     console.log(`\n🌐 Opening PR in browser...`);
     await open(pr.url).catch(() => {
       // Browser open is best-effort
@@ -235,6 +268,10 @@ export const createPRCommand = createCmd({
         ...(aiAvailable ?
           [{ value: 'regenerate' as const, label: 'Regenerate description' }]
         : []),
+        {
+          value: 'toggleDraft' as const,
+          label: isDraft ? 'Mark as ready for review' : 'Mark as draft',
+        },
         { value: 'open' as const, label: 'Open in browser' },
       ];
 
@@ -253,6 +290,26 @@ export const createPRCommand = createCmd({
           console.log(`\n📋 Could not open browser. Use this URL:`);
           console.log(pr.url);
         });
+        continue;
+      }
+
+      if (action === 'toggleDraft') {
+        const nextIsDraft = !isDraft;
+
+        try {
+          await github.setPRDraft({ prNumber: pr.number, draft: nextIsDraft });
+          isDraft = nextIsDraft;
+          console.log(
+            isDraft ?
+              `✅ PR marked as draft.`
+            : `✅ PR marked as ready for review.`,
+          );
+        } catch (error) {
+          console.error(
+            `\n❌ Failed to mark PR as ${nextIsDraft ? 'draft' : 'ready for review'}:`,
+            error,
+          );
+        }
         continue;
       }
 
@@ -323,8 +380,9 @@ async function openCompareUrl(params: {
   currentBranch: string;
   prTitle: string;
   prBody: string;
+  draft: boolean;
 }): Promise<void> {
-  const { baseBranch, currentBranch, prTitle, prBody } = params;
+  const { baseBranch, currentBranch, prTitle, prBody, draft } = params;
   const { owner, repo } = await git.getRepoInfo();
   const compareUrl = github.buildCompareUrl({
     owner,
@@ -337,6 +395,12 @@ async function openCompareUrl(params: {
 
   console.log(`\n🌐 Opening GitHub to create PR...`);
 
+  if (draft) {
+    console.log(
+      `   ℹ️  Choose "Create draft pull request" in the browser to open it as a draft.`,
+    );
+  }
+
   try {
     await open(compareUrl);
   } catch {
@@ -347,15 +411,36 @@ async function openCompareUrl(params: {
   console.log(`\n✅ Done! Complete the PR creation in your browser.`);
 }
 
-async function resolveBaseBranchWithPrompt(
-  argBaseBranch: string | undefined,
-  configBaseBranch: string | ((currentBranch: string) => string) | undefined,
-  currentBranch: string,
-): Promise<string> {
-  const fromArgs =
-    argBaseBranch ?? resolveBaseBranch(configBaseBranch, currentBranch);
+async function resolveBaseBranchWithPrompt(params: {
+  argBaseBranch: string | undefined;
+  autoBase: boolean;
+  configBaseBranch: string | ((currentBranch: string) => string) | undefined;
+  currentBranch: string;
+}): Promise<string> {
+  const { argBaseBranch, autoBase, configBaseBranch, currentBranch } = params;
 
-  if (fromArgs) return fromArgs;
+  if (argBaseBranch) return argBaseBranch;
+
+  if (autoBase) {
+    console.log(`\n🔎 Auto-detecting base branch...`);
+
+    const detected = await git.findClosestBaseBranch(currentBranch);
+
+    if (detected) {
+      console.log(
+        `   Detected base branch: ${detected.branch} (${detected.distance} commit${detected.distance === 1 ? '' : 's'} ahead)`,
+      );
+      return detected.branch;
+    }
+
+    console.log(
+      `   ⚠️  Could not auto-detect a base branch. Falling back to config or prompt.`,
+    );
+  }
+
+  const fromConfig = resolveBaseBranch(configBaseBranch, currentBranch);
+
+  if (fromConfig) return fromConfig;
 
   const branches = await git.getLocalBranches();
   const otherBranches = branches.filter((b) => b !== currentBranch);
