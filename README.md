@@ -171,7 +171,7 @@ ai-cmds create-pr
 # Create PR against a specific base branch
 ai-cmds create-pr --base develop
 
-# Auto-detect the base branch (closest ancestor among remote branches on origin)
+# Use the default branch configured on origin (e.g. main) as the base
 ai-cmds create-pr --auto-base
 
 # Create the PR as a draft
@@ -193,7 +193,7 @@ ai-cmds create-pr --title "Fix login validation"
 **Arguments:**
 
 - `--base` - Base branch for the PR (if not specified, uses config or prompts)
-- `--auto-base` - Auto-detect the base branch: fetches `origin` and picks the remote branch (`origin/*`) with the fewest commits between its merge-base and `HEAD`, ignoring branches that already contain `HEAD` and branches already merged (into another candidate, or as the head of a merged PR). Ties prefer `main`, `master`, `develop`, `dev`, then shorter names. Falls back to config or the prompt if nothing is found. `--base` takes precedence
+- `--auto-base` - Use the default branch configured on `origin` (the target of `origin/HEAD`, e.g. `main`) as the base. Falls back to config or the prompt if it cannot be resolved. `--base` takes precedence
 - `--draft` - Create the PR as a draft (with `--web` or the browser fallback, pick "Create draft pull request" in GitHub)
 - `--no-ai` - Skip AI generation and use template only
 - `--dry-run` - Preview PR content without opening browser

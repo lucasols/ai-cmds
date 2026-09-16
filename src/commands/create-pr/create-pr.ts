@@ -23,7 +23,7 @@ export const createPRCommand = createCmd({
       type: 'flag',
       name: 'auto-base',
       description:
-        'Auto-detect the base branch (the closest ancestor among remote branches on origin)',
+        'Use the default branch configured on origin as the base branch',
     },
     draft: {
       type: 'flag',
@@ -411,23 +411,6 @@ async function openCompareUrl(params: {
   console.log(`\n✅ Done! Complete the PR creation in your browser.`);
 }
 
-/**
- * Among branches git cannot tell apart, skip the ones whose latest PR was
- * merged: they are leftovers of previous PRs, not bases.
- */
-async function findMergedPRHeads(branches: string[]): Promise<string[]> {
-  if (!(await github.isGhAvailable())) return [];
-
-  const merged: string[] = [];
-
-  for (const branch of branches) {
-    const pr = await github.checkExistingPR(branch);
-    if (pr?.state === 'MERGED') merged.push(branch);
-  }
-
-  return merged;
-}
-
 async function resolveBaseBranchWithPrompt(params: {
   argBaseBranch: string | undefined;
   autoBase: boolean;
@@ -439,25 +422,17 @@ async function resolveBaseBranchWithPrompt(params: {
   if (argBaseBranch) return argBaseBranch;
 
   if (autoBase) {
-    console.log(`\n🔎 Auto-detecting base branch from origin...`);
+    console.log(`\n🔎 Detecting the default branch of origin...`);
 
-    await git.fetchRemote().catch(() => {
-      // Best-effort: fall back to the existing remote-tracking refs
-    });
-
-    const detected = await git.findClosestBaseBranch(currentBranch, {
-      resolveTiedBranches: findMergedPRHeads,
-    });
+    const detected = await git.getRemoteDefaultBranch();
 
     if (detected) {
-      console.log(
-        `   Detected base branch: ${detected.branch} (${detected.distance} commit${detected.distance === 1 ? '' : 's'} ahead)`,
-      );
-      return detected.branch;
+      console.log(`   Detected base branch: ${detected}`);
+      return detected;
     }
 
     console.log(
-      `   ⚠️  Could not auto-detect a base branch. Falling back to config or prompt.`,
+      `   ⚠️  Could not detect the default branch of origin. Falling back to config or prompt.`,
     );
   }
 

@@ -133,203 +133,39 @@ export async function getLocalBranches(): Promise<string[]> {
     .sort((a, b) => a.length - b.length);
 }
 
-export async function getRemoteBranches(): Promise<string[]> {
-  const output = await runCmdSilentUnwrap([
+/**
+ * Resolves the default branch configured on `origin` (the target of
+ * `origin/HEAD`), e.g. `main`. Uses the local remote-tracking ref when it
+ * exists and falls back to querying the remote.
+ */
+export async function getRemoteDefaultBranch(): Promise<string | null> {
+  const prefix = 'refs/remotes/origin/';
+
+  const local = await runCmdSilent([
     'git',
-    'branch',
-    '--remotes',
-    '--format=%(refname:short)',
+    'symbolic-ref',
+    '-q',
+    'refs/remotes/origin/HEAD',
   ]);
 
-  const prefix = 'origin/';
-
-  return output
-    .trim()
-    .split('\n')
-    .filter((ref) => ref.startsWith(prefix) && ref !== 'origin/HEAD')
-    .map((ref) => ref.slice(prefix.length))
-    .sort((a, b) => a.length - b.length);
-}
-
-export async function fetchRemote(): Promise<void> {
-  const result = await runCmdSilent(['git', 'fetch', 'origin', '--prune']);
-
-  if (result.error) {
-    throw new Error(result.stderr || 'Failed to fetch origin');
-  }
-}
-
-export type BaseBranchCandidate = {
-  branch: string;
-  /** Number of commits on HEAD that are not reachable from the candidate branch */
-  distance: number;
-  /**
-   * True when the branch was already merged: its tip is a strict ancestor of
-   * another candidate's tip, or it was the head of a merged PR. Fast-forward
-   * and rebase merges leave the merged branch at the same distance as its
-   * target, so this is what breaks that tie.
-   */
-  alreadyMerged?: boolean;
-};
-
-export type FindClosestBaseBranchOptions = {
-  /**
-   * Called with branches tied for the smallest distance that git alone cannot
-   * tell apart (e.g. identical tips after a fast-forward merge). Returns the
-   * subset that should be skipped, such as heads of merged PRs.
-   */
-  resolveTiedBranches?: (branches: string[]) => Promise<string[]>;
-};
-
-const PREFERRED_BASE_BRANCHES = ['main', 'master', 'develop', 'dev'];
-
-function preferredBaseBranchIndex(branch: string): number {
-  const index = PREFERRED_BASE_BRANCHES.indexOf(branch);
-  return index === -1 ? PREFERRED_BASE_BRANCHES.length : index;
-}
-
-/**
- * Picks the most likely base branch: the candidate with the fewest commits
- * between its merge-base and HEAD. Candidates that already contain HEAD
- * (distance 0) are descendants or equal to the current branch and are skipped,
- * as are branches already merged into another candidate. Ties are broken by
- * well-known base names, then by shorter branch names.
- */
-export function pickClosestBaseBranch(
-  candidates: BaseBranchCandidate[],
-): BaseBranchCandidate | null {
-  const sorted = candidates
-    .filter((candidate) => candidate.distance > 0 && !candidate.alreadyMerged)
-    .toSorted((a, b) => {
-      if (a.distance !== b.distance) return a.distance - b.distance;
-
-      const preferenceDiff =
-        preferredBaseBranchIndex(a.branch) - preferredBaseBranchIndex(b.branch);
-      if (preferenceDiff !== 0) return preferenceDiff;
-
-      if (a.branch.length !== b.branch.length) {
-        return a.branch.length - b.branch.length;
-      }
-
-      return a.branch.localeCompare(b.branch);
-    });
-
-  return sorted[0] ?? null;
-}
-
-/**
- * Finds the closest base branch among the remote-tracking branches of
- * `origin`, since the PR base is the remote branch. Returns the branch name
- * without the `origin/` prefix.
- */
-export async function findClosestBaseBranch(
-  currentBranch: string,
-  options: FindClosestBaseBranchOptions = {},
-): Promise<BaseBranchCandidate | null> {
-  const branches = await getRemoteBranches();
-  const candidates: BaseBranchCandidate[] = [];
-
-  for (const branch of branches) {
-    if (branch === currentBranch) continue;
-
-    const result = await runCmdSilent([
-      'git',
-      'rev-list',
-      '--count',
-      `origin/${branch}..HEAD`,
-    ]);
-
-    if (result.error) continue;
-
-    const distance = Number.parseInt(result.stdout.trim(), 10);
-
-    if (Number.isNaN(distance)) continue;
-
-    candidates.push({ branch, distance });
+  if (!local.error) {
+    const ref = local.stdout.trim();
+    if (ref.startsWith(prefix)) return ref.slice(prefix.length);
   }
 
-  await markAlreadyMergedTiedCandidates(candidates, options);
-
-  return pickClosestBaseBranch(candidates);
-}
-
-/**
- * A branch contained in another candidate can never be strictly closer to
- * HEAD than that candidate, so merged branches only matter when they tie for
- * the smallest distance. Flags those so the branch they were merged into wins.
- */
-async function markAlreadyMergedTiedCandidates(
-  candidates: BaseBranchCandidate[],
-  options: FindClosestBaseBranchOptions,
-): Promise<void> {
-  const distances = candidates
-    .filter((candidate) => candidate.distance > 0)
-    .map((candidate) => candidate.distance);
-
-  if (distances.length === 0) return;
-
-  const minDistance = Math.min(...distances);
-  const tied = candidates.filter(
-    (candidate) => candidate.distance === minDistance,
-  );
-
-  if (tied.length < 2) return;
-
-  const tipsResult = await runCmdSilent([
+  const remote = await runCmdSilent([
     'git',
-    'rev-parse',
-    ...tied.map((candidate) => `origin/${candidate.branch}`),
+    'ls-remote',
+    '--symref',
+    'origin',
+    'HEAD',
   ]);
 
-  if (tipsResult.error) return;
+  if (remote.error) return null;
 
-  const tips = tipsResult.stdout.trim().split('\n');
+  const match = /^ref: refs\/heads\/(\S+)\tHEAD$/m.exec(remote.stdout);
 
-  if (tips.length !== tied.length) return;
-
-  const tipByBranch = new Map(
-    tied.map((candidate, index) => [candidate.branch, tips[index]]),
-  );
-
-  for (const candidate of tied) {
-    const containingResult = await runCmdSilent([
-      'git',
-      'branch',
-      '--remotes',
-      '--contains',
-      `origin/${candidate.branch}`,
-      '--format=%(refname:short)',
-    ]);
-
-    if (containingResult.error) continue;
-
-    const containingBranches = new Set(
-      containingResult.stdout.trim().split('\n').filter(Boolean),
-    );
-
-    const candidateTip = tipByBranch.get(candidate.branch);
-
-    candidate.alreadyMerged = tied.some(
-      (other) =>
-        other.branch !== candidate.branch &&
-        tipByBranch.get(other.branch) !== candidateTip &&
-        containingBranches.has(`origin/${other.branch}`),
-    );
-  }
-
-  const stillTied = tied.filter((candidate) => !candidate.alreadyMerged);
-
-  if (stillTied.length < 2 || !options.resolveTiedBranches) return;
-
-  const toSkip = new Set(
-    await options.resolveTiedBranches(
-      stillTied.map((candidate) => candidate.branch),
-    ),
-  );
-
-  for (const candidate of stillTied) {
-    if (toSkip.has(candidate.branch)) candidate.alreadyMerged = true;
-  }
+  return match?.[1] ?? null;
 }
 
 export async function getRepoInfo(): Promise<{ owner: string; repo: string }> {
@@ -423,9 +259,7 @@ export const git = {
   getRemoteUrl,
   getRepoInfo,
   getLocalBranches,
-  getRemoteBranches,
-  fetchRemote,
-  findClosestBaseBranch,
+  getRemoteDefaultBranch,
   stageAll,
   commit,
   hasChanges,
