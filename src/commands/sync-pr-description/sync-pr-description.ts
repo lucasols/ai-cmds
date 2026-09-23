@@ -2,6 +2,7 @@ import { cliInput, createCmd } from '@ls-stack/cli';
 import { loadConfig, resolveBaseBranch } from '../../lib/config.ts';
 import { git } from '../../lib/git.ts';
 import { github } from '../../lib/github.ts';
+import { withPromptTimeout } from '../../lib/prompt-timeout.ts';
 import { showErrorAndExit } from '../../lib/shell.ts';
 import { applyExcludePatterns } from '../shared/diff-utils.ts';
 import {
@@ -151,21 +152,23 @@ export const syncPRDescriptionCommand = createCmd({
       console.log(`Summary: ${generatedContent.summary}`);
       console.log(separator);
 
-      const action = await cliInput.select('What would you like to do?', {
-        options: [
-          {
-            value: 'updateDescription' as const,
-            label: 'Update description only',
-          },
-          {
-            value: 'updateBoth' as const,
-            label: 'Update description + title',
-          },
-          { value: 'editTitle' as const, label: 'Edit suggested title' },
-          { value: 'regenerate' as const, label: 'Regenerate' },
-          { value: 'cancel' as const, label: 'Cancel' },
-        ],
-      });
+      const action = await withPromptTimeout(
+        cliInput.select('What would you like to do?', {
+          options: [
+            {
+              value: 'updateDescription' as const,
+              label: 'Update description only',
+            },
+            {
+              value: 'updateBoth' as const,
+              label: 'Update description + title',
+            },
+            { value: 'editTitle' as const, label: 'Edit suggested title' },
+            { value: 'regenerate' as const, label: 'Regenerate' },
+            { value: 'cancel' as const, label: 'Cancel' },
+          ],
+        }),
+      );
 
       if (action === 'cancel') {
         console.log('\n🚫 Cancelled.\n');
@@ -173,13 +176,17 @@ export const syncPRDescriptionCommand = createCmd({
       }
 
       if (action === 'editTitle') {
-        prTitle = await cliInput.text('PR title:', { initial: prTitle });
+        prTitle = await withPromptTimeout(
+          cliInput.text('PR title:', { initial: prTitle }),
+        );
         continue;
       }
 
       if (action === 'regenerate') {
-        const extraContext = await cliInput.text(
-          'Additional context for regeneration (leave empty to just retry):',
+        const extraContext = await withPromptTimeout(
+          cliInput.text(
+            'Additional context for regeneration (leave empty to just retry):',
+          ),
         );
 
         console.log(`\n🤖 Regenerating PR description...`);

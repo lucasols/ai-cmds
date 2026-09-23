@@ -12,6 +12,7 @@ AI-powered CLI tool that uses OpenAI and Google Gemini models to review code cha
 - Optional provider-aware concurrency limits for reviewer fan-out
 - AI-generated commit messages with interactive editing
 - AI-generated PR titles and descriptions
+- Final interactive prompts (`commit`, `create-pr`, `sync-pr-description`) exit automatically after 20 minutes without a response
 - Automatic filtering of import-only changes
 - Custom review instructions support
 - Token usage tracking and cost awareness

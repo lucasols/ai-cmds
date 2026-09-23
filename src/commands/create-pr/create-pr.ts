@@ -3,6 +3,7 @@ import open from 'open';
 import { loadConfig, resolveBaseBranch } from '../../lib/config.ts';
 import { git } from '../../lib/git.ts';
 import { github } from '../../lib/github.ts';
+import { withPromptTimeout } from '../../lib/prompt-timeout.ts';
 import { showErrorAndExit } from '../../lib/shell.ts';
 import { applyExcludePatterns } from '../shared/diff-utils.ts';
 import { detectAvailableProvider, generatePRContent } from './pr-generator.ts';
@@ -275,9 +276,10 @@ export const createPRCommand = createCmd({
         { value: 'open' as const, label: 'Open in browser' },
       ];
 
-      const action = await cliInput.select(
-        'PR created. What would you like to do?',
-        { options },
+      const action = await withPromptTimeout(
+        cliInput.select('PR created. What would you like to do?', {
+          options,
+        }),
       );
 
       if (action === 'done') {
@@ -314,7 +316,9 @@ export const createPRCommand = createCmd({
       }
 
       if (action === 'editTitle') {
-        prTitle = await cliInput.text('PR title:', { initial: prTitle });
+        prTitle = await withPromptTimeout(
+          cliInput.text('PR title:', { initial: prTitle }),
+        );
 
         try {
           await github.updatePR({
@@ -330,8 +334,10 @@ export const createPRCommand = createCmd({
       }
 
       // action === 'regenerate'
-      const extraContext = await cliInput.text(
-        'Additional context for regeneration (leave empty to just retry):',
+      const extraContext = await withPromptTimeout(
+        cliInput.text(
+          'Additional context for regeneration (leave empty to just retry):',
+        ),
       );
 
       console.log(`\n🤖 Regenerating PR description...`);

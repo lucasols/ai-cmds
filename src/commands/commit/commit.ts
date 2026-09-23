@@ -3,6 +3,7 @@ import { estimateTokenCount, sliceByTokens } from 'tokenx';
 import { formatNum } from '../../lib/diff.ts';
 import { loadConfig } from '../../lib/config.ts';
 import { git } from '../../lib/git.ts';
+import { withPromptTimeout } from '../../lib/prompt-timeout.ts';
 import { showErrorAndExit } from '../../lib/shell.ts';
 import { applyExcludePatterns } from '../shared/diff-utils.ts';
 import { generateCommitMessage } from './commit-message-generator.ts';
@@ -164,14 +165,16 @@ export const commitCommand = createCmd({
         return;
       }
 
-      const action = await cliInput.select('What would you like to do?', {
-        options: [
-          { value: 'commit', label: 'Commit' },
-          { value: 'edit', label: 'Edit message' },
-          { value: 'regenerate', label: 'Regenerate' },
-          { value: 'cancel', label: 'Cancel' },
-        ],
-      });
+      const action = await withPromptTimeout(
+        cliInput.select('What would you like to do?', {
+          options: [
+            { value: 'commit', label: 'Commit' },
+            { value: 'edit', label: 'Edit message' },
+            { value: 'regenerate', label: 'Regenerate' },
+            { value: 'cancel', label: 'Cancel' },
+          ],
+        }),
+      );
 
       if (action === 'cancel') {
         console.log('\n🚫 Commit cancelled.\n');
@@ -179,9 +182,9 @@ export const commitCommand = createCmd({
       }
 
       if (action === 'edit') {
-        message = await cliInput.text('Edit commit message:', {
-          initial: message,
-        });
+        message = await withPromptTimeout(
+          cliInput.text('Edit commit message:', { initial: message }),
+        );
         continue;
       }
 
