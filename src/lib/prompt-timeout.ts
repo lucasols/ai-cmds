@@ -1,4 +1,4 @@
-const DEFAULT_PROMPT_TIMEOUT_MS = 20 * 60 * 1000;
+const DEFAULT_PROMPT_TIMEOUT_MS = 3 * 60 * 1000;
 
 /**
  * Exits the process if the prompt is not answered within the timeout. Used on
