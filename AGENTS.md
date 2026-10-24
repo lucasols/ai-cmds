@@ -24,6 +24,13 @@ pnpm build:no-test        # Build without tests
 pnpm vitest run tests/config.test.ts
 ```
 
+## Git and Publishing Workflow
+
+These are pre-approved, do them without asking the user for confirmation:
+
+- Always deliver changes through a pull request: create a branch from `main`, commit, push and open the PR with `gh pr create`. Never commit directly to `main`
+- Publish packages only from `main`, after the PR with the changes is merged: switch to an up-to-date `main` and run `pkg-manager publish --type <patch|minor|major>` from the repo root
+
 ## Architecture
 
 ```
